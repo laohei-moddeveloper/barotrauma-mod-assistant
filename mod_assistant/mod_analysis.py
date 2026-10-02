@@ -259,11 +259,8 @@ def inspect_all(mods: list[Mod], metadata: dict | None = None) -> dict[str, Feat
 
 
 def luacs_runtime_detected(env: Environment) -> bool | None:
-    try:
-        # Read the game assembly, not the downloaded LuaCs workshop DLL.
-        return b"LuaCs" in (env.game / "Barotrauma.dll").read_bytes()
-    except OSError:
-        return None
+    from .luacs import status
+    return status(env).runtime
 
 
 def pair_evidence(left: Features, right: Features) -> tuple[int, str]:
@@ -312,7 +309,8 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
     for mod in mods:
         feature = features.get(mod.item_id, Features(mod.item_id, mod.name, partial=True))
         reasons, severity = [], 0
-        missing = [item for item in sorted(feature.workshop_dependencies) if item not in active]
+        missing = [item for item in sorted(feature.workshop_dependencies) if item not in active
+                   and not (item == "2559634234" and runtime_luacs is True)]
         if missing:
             labels = [features[x].name if x in features else x for x in missing]
             reasons.append("发布者标注的依赖未启用：" + "、".join(labels[:3]))

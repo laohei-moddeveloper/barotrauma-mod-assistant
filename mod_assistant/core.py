@@ -340,7 +340,11 @@ def inventory(env: Environment) -> list[Mod]:
                 except (AssistantError, OSError) as error:
                     mod.status = f"需要检查：{error}"
                 mods.append(mod)
-    return sorted(mods, key=lambda m: (not m.enabled, m.name.lower()))
+    from .mod_order import read_order
+    order = {item: index for index, item in enumerate(read_order(env, strict=False))}
+    return sorted(mods, key=lambda m: (not m.enabled,
+                                      order.get(m.item_id, -1 if m.enabled else len(order)),
+                                      m.name.lower()))
 
 
 def validate_manifest(folder: Path, env: Environment) -> list[str]:

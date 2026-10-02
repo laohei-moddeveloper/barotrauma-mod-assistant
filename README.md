@@ -1,11 +1,49 @@
-# 潜渊症模组更新助手 0.2.0
+# 潜渊症模组更新助手
 
-在并行更新基础上增加模组启用开关、类型和重要程度、XML 与 Lua/C# 源码兼容风险分析及完整分析导出。
+面向 Windows 64 位 Steam 版《潜渊症》（Barotrauma）的独立模组管理工具。当前版本 **0.3.0**。
 
-从仓库 Releases 下载本版本 Windows 压缩包，解压运行 EXE。详见 [使用说明](使用说明.md)。
+## 下载和使用
 
-本版本恢复自对应历史发布源码，34 项测试及重新构建后的独立程序自检通过。恢复及二进制重建说明见 [本版本发布记录](releases/v0.2.0.md)。
+在本仓库的 [Releases](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases) 下载对应版本的 Windows 压缩包，解压后双击「潜渊症模组更新助手.exe」。无需安装 Python。保持 Steam 已登录，更新、切换启用状态、保存顺序及安装 LuaCs 前请关闭游戏和专用服务器。详细操作见 [使用说明](使用说明.md)。
 
-开发需要 Python 3.12；测试：`python -m unittest discover -s tests -v`。构建：创建 `.build-tools` 虚拟环境，安装 `requirements-build.txt`，再运行 `build.ps1`。
+## 功能
 
-不附带原版游戏文件、第三方模组、个人配置或运行日志。
+- 同时向 Steam 提交多个工坊更新请求，并行安装已完成的缓存；校验、复用未变化文件、失败重试及备份恢复。
+- 单独控制工坊和本地模组的启用状态；分析模组类型、影响范围及资源和 Lua/C# 源码的兼容风险。
+- 展示实际启用模组顺序，支持拖动、上下移动和自动排序建议；保存前预览，并备份游戏配置。
+- 一键安装官方 LuaCs Windows 客户端补丁并永久开启 C#；检查补丁哈希、游戏版本及运行状态，支持恢复安装前文件。
+- 导出更新报告、静态兼容分析和包含加载顺序的联机清单。
+
+Steam 负责实际下载调度，助手不能保证突破客户端队列或带宽限制。兼容风险及自动排序属于静态分析建议，作者说明和游戏内测试优先。开启 C# 后请使用可信来源的脚本模组。
+
+## 版本
+
+| 版本 | 主要变化 | 验证 |
+| --- | --- | --- |
+| 0.1.0 | 并行请求与安装、缓存复用、校验、备份恢复 | 22 项测试 |
+| 0.2.0 | 启用开关、类型与重要程度、资源和脚本兼容分析 | 34 项测试 |
+| 0.3.0 | 自动/拖动排序、LuaCs 与永久 C# 一键设置、游戏运行时检测提示 | 47 项测试 |
+
+版本变化见 [CHANGELOG](CHANGELOG.md)，发布及重建说明见 [releases](releases)，验证范围见 [docs/validation.md](docs/validation.md)。0.1.0 与 0.2.0 的安装包从对应历史源码重新构建，发布记录会明确标注。
+
+## 开发
+
+使用 Python 3.12，应用运行代码仅依赖标准库。测试：
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+构建独立程序：
+
+```powershell
+py -3.12 -m venv .build-tools
+.\.build-tools\Scripts\python.exe -m pip install -r requirements-build.txt
+.\build.ps1
+```
+
+入口为 `run_assistant.py`，源码在 `mod_assistant`，构建输出在 `dist`。界面截图开发工具额外需要 Pillow。原始环境调查、个人配置、游戏内容、第三方参考源码、缓存、日志和本机工具目录不纳入 Git。
+
+## 依据
+
+使用本机游戏自带的 Steam 接口库，接口依据 [ISteamUGC 官方文档](https://partner.steamgames.com/doc/api/ISteamUGC)。LuaCs 补丁来自 [官方发布](https://github.com/evilfactory/LuaCsForBarotrauma/releases/tag/latest)，安装方式依据 [官方手动安装文档](https://github.com/evilfactory/LuaCsForBarotrauma/blob/master/luacs-docs/lua/manual/installing-lua-for-barotrauma-manually.md)。本仓库和下载包不分发原版游戏文件或第三方工坊模组。

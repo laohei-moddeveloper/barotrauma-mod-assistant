@@ -5,6 +5,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import tkinter as tk
 from PIL import ImageGrab
 from mod_assistant.app import App
+from mod_assistant.order_ui import OrderDialog
+from mod_assistant.core import atomic_json
 
 root = tk.Tk()
 app = App(root)
@@ -16,15 +18,42 @@ def capture():
         root.attributes("-topmost", True)
         root.lift()
         root.update()
-        x, y = root.winfo_rootx(), root.winfo_rooty()
-        scale = ImageGrab.grab().width / root.winfo_screenwidth()
-        picture = ImageGrab.grab(bbox=tuple(round(v * scale) for v in
-                                 (x, y, x + root.winfo_width(), y + root.winfo_height())))
-        path = Path(__file__).resolve().parents[1] / "Research" / "ui-preview-v2.png"
-        picture.save(path)
-        root.attributes("-topmost", False)
-        print(path, picture.size)
-        app.close()
+        def snap(window, name):
+            window.update()
+            x, y = window.winfo_rootx(), window.winfo_rooty()
+            scale = ImageGrab.grab().width / root.winfo_screenwidth()
+            picture = ImageGrab.grab(bbox=tuple(round(v * scale) for v in
+                                     (x, y, x + window.winfo_width(), y + window.winfo_height())))
+            path = Path(__file__).resolve().parents[1] / "Research" / name
+            picture.save(path)
+            print(path, picture.size)
+        snap(root, "ui-preview-v3.png")
+        config = app.env.game / "config_player.xml"
+        original = config.read_bytes()
+        dialog = OrderDialog(app)
+        dialog.window.attributes("-topmost", True)
+        dialog.window.update()
+        before = list(dialog.ids)
+        if len(before) > 1:
+            first, second = dialog.list.bbox(0), dialog.list.bbox(1)
+            dialog.list.event_generate("<ButtonPress-1>", x=20, y=first[1] + 5)
+            dialog.list.event_generate("<B1-Motion>", x=20, y=second[1] + 5)
+            dialog.list.event_generate("<ButtonRelease-1>", x=20, y=second[1] + 5)
+            assert dialog.ids[:2] == [before[1], before[0]]
+            dialog.move(-1)
+            assert dialog.ids == before
+        dialog.automatic()
+        assert set(dialog.ids) == set(before)
+        assert config.read_bytes() == original
+        def finish():
+            snap(dialog.window, "ui-order-v3.png")
+            atomic_json(Path(__file__).resolve().parents[1] / "Research/ui-order-check.json",
+                        {"ok": True, "enabled_regular_mods": len(before), "drag_test": len(before) > 1,
+                         "automatic_preview": True, "live_configuration_unchanged": True})
+            dialog.window.destroy()
+            root.attributes("-topmost", False)
+            app.close()
+        root.after(400, finish)
     elif count[0] > 300:
         print("UI preview timed out")
         app.close()
