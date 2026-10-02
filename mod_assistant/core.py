@@ -287,17 +287,9 @@ class Mod:
 
 
 def inventory(env: Environment) -> list[Mod]:
-    enabled = set()
-    config = env.game / "config_player.xml"
-    if config.is_file():
-        try:
-            for element in ET.parse(config).findall(".//contentpackages/regularpackages/package"):
-                value = element.get("path", "").replace("\\", "/")
-                match = re.search(r"/(\d+)/filelist\.xml$", value)
-                if match:
-                    enabled.add(match[1])
-        except ET.ParseError:
-            pass
+    # Import here to keep the read-only discovery module separate from config edits.
+    from .mod_toggle import enabled_ids
+    enabled = enabled_ids(env)
     ids = set()
     for library in env.libraries:
         folder = library / "steamapps" / "workshop" / "content" / str(APP_ID)
@@ -330,6 +322,24 @@ def inventory(env: Environment) -> list[Mod]:
         except (AssistantError, ValueError, OSError) as error:
             mod.status = f"需要检查：{error}"
         mods.append(mod)
+    from .mod_toggle import local_id
+    for root in (env.game / "LocalMods", env.player / "LocalMods"):
+        if root.is_dir():
+            for folder in root.iterdir():
+                if not folder.is_dir() or not (folder / "filelist.xml").is_file():
+                    continue
+                item = local_id(folder)
+                mod = Mod(item, folder.name, folder, enabled=item in enabled)
+                try:
+                    package = load_package(folder)
+                    mod.name = package.get("name", folder.name)
+                    mod.mod_version = package.get("modversion", "")
+                    mod.installed_version = mod.mod_version
+                    mod.game_version = package.get("gameversion", "")
+                    mod.status = "本地模组 / 已启用" if mod.enabled else "本地模组 / 未启用"
+                except (AssistantError, OSError) as error:
+                    mod.status = f"需要检查：{error}"
+                mods.append(mod)
     return sorted(mods, key=lambda m: (not m.enabled, m.name.lower()))
 
 

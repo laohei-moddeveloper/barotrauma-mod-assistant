@@ -1,0 +1,369 @@
+"""Explainable, conservative mod type and compatibility estimates."""
+from __future__ import annotations
+
+from collections import defaultdict
+from dataclasses import dataclass, field
+import json
+from pathlib import Path
+import re
+import time
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+
+from .core import APP_ID, Environment, Mod, atomic_json, load_package, within
+
+
+KIND_BY_TAG = {
+    "item": "物品/装备", "structure": "物品/装备", "submarine": "潜艇/舰船",
+    "character": "生物/敌人", "npcsets": "生物/敌人",
+    "afflictions": "医疗/状态", "jobs": "职业/天赋", "talents": "职业/天赋",
+    "talenttrees": "职业/天赋", "missions": "任务/事件", "randomevents": "任务/事件",
+    "eventmanagersettings": "任务/事件", "disembarkperk": "任务/事件",
+    "outpostmodule": "地图/站点", "outpostconfig": "地图/站点",
+    "locationtypes": "地图/站点", "levelobjectprefabs": "地图/站点",
+    "mapgenerationparameters": "地图/站点", "wreck": "地图/站点",
+    "beaconstation": "地图/站点", "text": "语言/文本", "uistyle": "界面/音效",
+    "sounds": "界面/音效", "particles": "界面/音效",
+    "serverexecutable": "框架/脚本", "clientexecutable": "框架/脚本",
+}
+SYSTEM_KINDS = {"医疗/状态", "职业/天赋", "任务/事件", "地图/站点"}
+DEFINITION_TAGS = {"item", "structure", "character", "afflictions", "jobs", "talents",
+                   "talenttrees", "missions", "randomevents", "locationtypes",
+                   "levelobjectprefabs", "mapgenerationparameters", "outpostconfig", "npcsets"}
+PATH_REF = re.compile(r"%(?:Other)?ModDir:([^%]+)%", re.I)
+ADDON_NAME = re.compile(r"汉化|翻译|localization|translation|补丁|patch|addon|expansion|rebalance|整合", re.I)
+LUA_ADD = re.compile(r'\bHook\.Add\s*\(\s*[\'"]([^\'"]+)[\'"]\s*,\s*[\'"]([^\'"]+)[\'"]', re.I)
+LUA_PATCH = re.compile(r'\bHook\.Patch\s*\(\s*[\'"]([^\'"]+)[\'"]\s*,\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*[\'"]([^\'"]+)[\'"])?', re.I)
+CS_PATCH = re.compile(r'\[HarmonyPatch\s*\(\s*typeof\s*\(\s*([\w.]+)\s*\)\s*,\s*(?:nameof\s*\(\s*[\w.]+\.([\w]+)\s*\)|[\'"]([^\'"]+)[\'"])', re.I)
+LUA_GLOBAL = re.compile(r'\b((?:NTC|NT|Tsm|TSM|EHA|EW)\.[A-Za-z_]\w*)\s*=\s*(?![=])')
+PREFAB_TAGS = {
+    "item": {"item"}, "structure": {"structure"}, "character": {"character"},
+    "afflictions": {"affliction"}, "jobs": {"job"}, "talents": {"talent"},
+    "talenttrees": {"talenttree"}, "locationtypes": {"locationtype"},
+    "levelobjectprefabs": {"levelobjectprefab", "levelobject"},
+    "mapgenerationparameters": {"mapgenerationparameters", "levelgenerationparameters"},
+    "outpostconfig": {"outpostconfig"}, "npcsets": {"npc", "npcset"},
+}
+
+
+@dataclass
+class Features:
+    item_id: str
+    name: str
+    kinds: tuple[str, ...] = ()
+    tags: tuple[str, ...] = ()
+    definitions: set[tuple[str, str, str]] = field(default_factory=set)
+    path_dependencies: set[str] = field(default_factory=set)
+    workshop_dependencies: set[str] = field(default_factory=set)
+    core: bool = False
+    partial: bool = False
+    hook_names: set[tuple[str, str]] = field(default_factory=set)
+    hook_events: set[str] = field(default_factory=set)
+    patches: set[tuple[str, str]] = field(default_factory=set)
+    globals_written: set[str] = field(default_factory=set)
+    code_files: int = 0
+    opaque_code: int = 0
+
+
+@dataclass
+class Assessment:
+    item_id: str
+    kinds: tuple[str, ...]
+    importance: str
+    compatibility: str
+    reasons: list[str]
+    compared: int = 0
+    risky_pairs: int = 0
+
+
+def workshop_details(env: Environment, ids: list[str], allow_network=True) -> tuple[dict, bool]:
+    """Use only public workshop IDs. The cache keeps analysis useful offline."""
+    ids = [item for item in ids if item.isdecimal()]
+    cache = env.work / "analysis" / "workshop-details.json"
+    try:
+        saved = json.loads(cache.read_text(encoding="utf-8"))
+        entries = saved.get("entries", {})
+        if not isinstance(entries, dict):
+            entries = {}
+    except (OSError, ValueError):
+        entries, saved = {}, {}
+    if not allow_network or (set(ids).issubset(entries)
+                             and time.time() - saved.get("fetched_at", 0) < 86400):
+        return entries, bool(entries)
+    try:
+        for index in range(0, len(ids), 75):
+            batch = ids[index:index + 75]
+            data = {"itemcount": len(batch)}
+            data.update({f"publishedfileids[{n}]": item for n, item in enumerate(batch)})
+            request = urllib.request.Request(
+                "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/",
+                data=urllib.parse.urlencode(data).encode("ascii"), method="POST")
+            with urllib.request.urlopen(request, timeout=9) as response:
+                values = json.load(response).get("response", {}).get("publishedfiledetails", [])
+            for value in values:
+                item = str(value.get("publishedfileid", ""))
+                if item in batch and value.get("result") == 1 and value.get("consumer_app_id") == APP_ID:
+                    entries[item] = {
+                        "tags": [x.get("tag", "") for x in value.get("tags", []) if isinstance(x, dict)],
+                        "children": [str(x.get("publishedfileid", "")) for x in value.get("children", [])
+                                     if isinstance(x, dict) and str(x.get("publishedfileid", "")).isdecimal()],
+                    }
+        atomic_json(cache, {"fetched_at": time.time(), "entries": entries})
+        return entries, True
+    except (OSError, ValueError, KeyError):
+        return entries, bool(entries)
+
+
+def _resource_path(folder: Path, name: str, own_name: str) -> Path | None:
+    value = name.replace("\\", "/")
+    for match in PATH_REF.finditer(value):
+        if match.group(1).casefold() != own_name.casefold():
+            return None
+        value = value.replace(match.group(), "%ModDir%")
+    if not value.startswith("%ModDir%/"):
+        return None
+    path = folder / value[len("%ModDir%/"):]
+    return path if within(path, folder) and path.is_file() else None
+
+
+def _definitions(path: Path, category: str) -> set[tuple[str, str, str]]:
+    found = set()
+    root = ET.parse(path).getroot()
+    candidates = [root] + list(root)
+    for child in list(root):
+        if child.tag.casefold() == "override":
+            candidates.extend(list(child))
+            for group in child:
+                candidates.extend(list(group))
+    for element in candidates:
+        identifier = element.get("identifier", "").strip().casefold()
+        tag = element.tag.casefold()
+        allowed = PREFAB_TAGS.get(category)
+        if category == "missions":
+            allowed_match = tag.endswith("mission")
+        elif category == "randomevents":
+            allowed_match = tag in {"eventset", "event"} or tag.endswith("eventprefab")
+        else:
+            allowed_match = allowed is not None and tag in allowed
+        if identifier and allowed_match:
+            found.add((category, element.tag.casefold(), identifier))
+    return found
+
+
+def _code_signals(folder: Path, result: Features):
+    for path in folder.rglob("*"):
+        if not path.is_file():
+            continue
+        suffix = path.suffix.casefold()
+        if suffix == ".dll":
+            result.opaque_code += 1
+            continue
+        if suffix not in (".lua", ".cs"):
+            continue
+        result.code_files += 1
+        try:
+            if path.stat().st_size > 2_000_000:
+                result.partial = True
+                continue
+            source = path.read_text(encoding="utf-8-sig", errors="replace")
+        except OSError:
+            result.partial = True
+            continue
+        # Strip only whole-line comments. The scanner deliberately stays
+        # conservative: dynamic hook arguments and generated code are unknown.
+        marker = "--" if suffix == ".lua" else "//"
+        source = "\n".join(line for line in source.splitlines()
+                           if not line.lstrip().startswith(marker))
+        result.hook_names.update((event.casefold(), name.casefold()) for event, name in LUA_ADD.findall(source))
+        result.hook_events.update(event.casefold() for event, _ in LUA_ADD.findall(source))
+        result.patches.update(((method_or_owner if named_method else owner_or_id).casefold(),
+                               (named_method or method_or_owner).casefold())
+                              for owner_or_id, method_or_owner, named_method in LUA_PATCH.findall(source))
+        result.patches.update((owner.casefold(), (named or literal).casefold())
+                              for owner, named, literal in CS_PATCH.findall(source))
+        result.globals_written.update(name.casefold() for name in LUA_GLOBAL.findall(source))
+
+
+def inspect(mod: Mod, metadata: dict | None = None) -> Features:
+    metadata = metadata or {}
+    result = Features(mod.item_id, mod.name,
+                      workshop_dependencies=set(metadata.get("children", [])))
+    if mod.source is None or not (mod.source / "filelist.xml").is_file():
+        result.partial = True
+        return result
+    try:
+        root = load_package(mod.source)
+        result.core = root.get("corepackage", "false").casefold() == "true"
+        tags = [element.tag.casefold() for element in root]
+        result.tags = tuple(sorted(set(tags)))
+        kinds = {KIND_BY_TAG[x] for x in tags if x in KIND_BY_TAG}
+        name = mod.name.casefold()
+        external_tags = {str(x).casefold() for x in metadata.get("tags", [])}
+        if (result.core or "framework" in name or "library" in external_tags
+                or any(x in tags for x in ("serverexecutable", "clientexecutable"))):
+            kinds.add("框架/脚本")
+        if "汉化" in name or "翻译" in name or "localization" in name or "translation" in name:
+            kinds.add("语言/文本")
+        if "neurotrauma" in name or "医疗" in name:
+            kinds.add("医疗/状态")
+        if "patch" in name or "补丁" in name or "rebalance" in name:
+            kinds.add("补丁/调整")
+        if "lua" in name or "(cs)" in name:
+            kinds.add("脚本/工具")
+        if kinds - {"语言/文本", "界面/音效"} and not re.search(
+                r"汉化|翻译|localization|translation", name, re.I):
+            kinds.discard("语言/文本")
+        if kinds - {"语言/文本", "界面/音效"}:
+            kinds.discard("界面/音效")
+        if not kinds:
+            kinds.add("其他")
+        weights = {"框架/脚本": 0, "脚本/工具": 1, "补丁/调整": 2, "医疗/状态": 3,
+                   "地图/站点": 3, "任务/事件": 4, "生物/敌人": 5,
+                   "职业/天赋": 6, "物品/装备": 7, "潜艇/舰船": 8,
+                   "语言/文本": 9, "界面/音效": 10, "其他": 11}
+        if "语言/文本" in kinds and ADDON_NAME.search(name):
+            weights["语言/文本"] = -1
+        result.kinds = tuple(sorted(kinds, key=lambda x: weights.get(x, 99)))
+        for element in root:
+            filename = element.get("file", "")
+            for dependency in PATH_REF.findall(filename):
+                if dependency.casefold() != mod.name.casefold():
+                    result.path_dependencies.add(dependency)
+            tag = element.tag.casefold()
+            if tag not in DEFINITION_TAGS or not filename.lower().endswith(".xml"):
+                continue
+            path = _resource_path(mod.source, filename, mod.name)
+            if path is None:
+                result.partial = True
+                continue
+            try:
+                if path.stat().st_size > 8_000_000:
+                    result.partial = True
+                    continue
+                result.definitions.update(_definitions(path, tag))
+            except (OSError, ET.ParseError):
+                result.partial = True
+        _code_signals(mod.source, result)
+        if result.code_files and "框架/脚本" not in result.kinds and "脚本/工具" not in result.kinds:
+            result.kinds = result.kinds + ("脚本/工具",)
+        return result
+    except (OSError, ET.ParseError):
+        result.partial = True
+        return result
+
+
+def inspect_all(mods: list[Mod], metadata: dict | None = None) -> dict[str, Features]:
+    metadata = metadata or {}
+    return {mod.item_id: inspect(mod, metadata.get(mod.item_id)) for mod in mods}
+
+
+def luacs_runtime_detected(env: Environment) -> bool | None:
+    try:
+        # Read the game assembly, not the downloaded LuaCs workshop DLL.
+        return b"LuaCs" in (env.game / "Barotrauma.dll").read_bytes()
+    except OSError:
+        return None
+
+
+def pair_evidence(left: Features, right: Features) -> tuple[int, str]:
+    overlaps = left.definitions & right.definitions
+    same_names = left.hook_names & right.hook_names
+    patches = left.patches & right.patches
+    globals_written = left.globals_written & right.globals_written
+    addon = (((ADDON_NAME.search(left.name) or left.name.casefold().startswith("enhanced "))
+              and right.name.casefold() in left.name.casefold())
+             or ((ADDON_NAME.search(right.name) or right.name.casefold().startswith("enhanced "))
+                 and left.name.casefold() in right.name.casefold()))
+    if same_names:
+        example = next(iter(sorted(same_names)))
+        return 3, f"Lua Hook.Add 重复注册 {example[0]}/{example[1]}，名称可能互相覆盖"
+    if globals_written:
+        example = next(iter(sorted(globals_written)))
+        return 2, f"脚本都写入共享变量 {example}，执行顺序可能改变结果"
+    if patches:
+        example = next(iter(sorted(patches)))
+        return 2, f"脚本都修改方法 {example[0]}.{example[1]}，需核对补丁顺序"
+    if overlaps:
+        example = "、".join(sorted({definition[2] for definition in overlaps})[:2])
+        category = "、".join(sorted({definition[0] for definition in overlaps})[:2])
+        if addon:
+            return 1 if len(overlaps) < 20 else 2, (f"配套模组覆盖 {len(overlaps)} 个{category}定义"
+                                                     f"（如 {example}），需按作者说明确定加载顺序")
+        return 2 if len(overlaps) > 1 else 1, (f"重复定义 {len(overlaps)} 个{category}标识"
+                                               f"（如 {example}），可能相互覆盖")
+    return 0, ""
+
+
+def evaluate(mods: list[Mod], features: dict[str, Features],
+             runtime_luacs: bool | None = None) -> dict[str, Assessment]:
+    active = {mod.item_id for mod in mods if mod.enabled}
+    names = {feature.name.casefold(): item for item, feature in features.items()}
+    pair_signals = defaultdict(list)
+    for index, left in enumerate(mods):
+        first = features.get(left.item_id, Features(left.item_id, left.name))
+        for right in mods[index + 1:]:
+            second = features.get(right.item_id, Features(right.item_id, right.name))
+            score, reason = pair_evidence(first, second)
+            if score:
+                pair_signals[left.item_id].append((score, right, reason))
+                pair_signals[right.item_id].append((score, left, reason))
+    result = {}
+    for mod in mods:
+        feature = features.get(mod.item_id, Features(mod.item_id, mod.name, partial=True))
+        reasons, severity = [], 0
+        missing = [item for item in sorted(feature.workshop_dependencies) if item not in active]
+        if missing:
+            labels = [features[x].name if x in features else x for x in missing]
+            reasons.append("发布者标注的依赖未启用：" + "、".join(labels[:3]))
+            severity = 3
+        for name in sorted(feature.path_dependencies):
+            dependency = names.get(name.casefold())
+            if dependency is None or dependency not in active:
+                reasons.append(f"资源路径需要另一模组：{name}（未检测到启用）")
+                severity = 3
+        if runtime_luacs is False and feature.code_files:
+            reasons.append(f"含 {feature.code_files} 个 Lua/C# 文件；本机游戏主程序未检出 LuaCs，脚本功能需先核实")
+            severity = max(severity, 3)
+        signals = sorted(pair_signals[mod.item_id],
+                         key=lambda value: (-int(value[1].item_id in active), -value[0], value[1].name))
+        for score, other, reason in signals[:4]:
+            state = "已启用" if other.item_id in active else "未启用"
+            other_kinds = features.get(other.item_id, Features(other.item_id, other.name)).kinds
+            kind = other_kinds[0] if other_kinds else "未知类型"
+            reasons.append(f"与{state}的 {kind} 模组 {other.name}：{reason}")
+            severity = max(severity, score)
+        if ADDON_NAME.search(mod.name):
+            matched = [other for other in mods if other.item_id != mod.item_id
+                       and len(other.name) >= 6 and other.name.casefold() in mod.name.casefold()]
+            for other in sorted(matched, key=lambda x: -len(x.name))[:1]:
+                if not other.enabled:
+                    reasons.append(f"名称显示可能配套 {other.name}，目前未启用；请核对发布者说明")
+                    severity = max(severity, 1)
+        if feature.partial:
+            reasons.append("部分资源未能分析，结论不完整")
+        if feature.opaque_code:
+            reasons.append("含编译后的程序库，部分内部行为无法仅凭文本资源判断")
+        if not reasons:
+            reasons.append(f"已与其他 {max(0, len(mods) - 1)} 个缓存模组比对资源及可读取的脚本，未发现直接重叠；仍需游戏内验证")
+        if feature.core or "框架/脚本" in feature.kinds:
+            importance = "关键组件"
+        elif len(feature.definitions) > 200 or len(set(feature.kinds) & SYSTEM_KINDS) >= 2:
+            importance = "高"
+        elif set(feature.kinds) <= {"语言/文本", "界面/音效", "其他", "补丁/调整"}:
+            importance = "低"
+        else:
+            importance = "中"
+        max_signal = max((score for score, _, _ in signals), default=0)
+        active_signal = max((score for score, other, _ in signals if other.item_id in active), default=0)
+        compatibility = ("低·运行条件" if runtime_luacs is False and feature.code_files else
+                         "低·缺前置" if missing or any("资源路径需要" in text for text in reasons) else
+                         "低·当前冲突风险" if mod.enabled and active_signal >= 3 else
+                         "低·潜在冲突风险" if max_signal >= 3 else
+                         "中·当前重叠" if mod.enabled and active_signal >= 2 else
+                         "中·潜在重叠" if max_signal >= 2 else
+                         "中·需核对" if severity == 1 else
+                         "未知·资料不足" if feature.partial else "高·未见冲突")
+        result[mod.item_id] = Assessment(mod.item_id, feature.kinds, importance,
+                                         compatibility, reasons, max(0, len(mods) - 1), len(signals))
+    return result
