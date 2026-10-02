@@ -1,0 +1,26 @@
+{
+  "version": "0.1.0",
+  "platform": "Windows x64",
+  "unit_tests_passed": 22,
+  "packaged_self_check": true,
+  "historical_binary_rebuilt": true,
+  "executable": {
+    "name": "潜渊症模组更新助手.exe",
+    "bytes": 13223263,
+    "sha256": "ddb9d717c99f3521910abd2f8411cbe950be0a14c73a5217d4552a314e1212f9"
+  },
+  "archive": {
+    "name": "BarotraumaModAssistant-v0.1.0-win64.zip",
+    "bytes": 12938041,
+    "sha256": "460aac208aeda0f31b75d6a95a4c969e408ed726b9913c476b577618d0531409"
+  },
+  "sources": {
+    "mod_assistant/__init__.py": "fe431d5544d3d16dc7c9ad12c429ac7b0a67f7396505c06bc0246b4429da7dd5",
+    "mod_assistant/app.py": "0029e3080c8821409583621b9c5f72c7f0aacae8674ec4036186c61c05630bcc",
+    "mod_assistant/core.py": "ab490e990171d91b94d378c9b8a8755b54a7c6b5cbd64b2062f8867d8461d931",
+    "mod_assistant/engine.py": "c1d39df696499f0d40e04927d0b9f95b4995aeac289094c76add1dd41206ccbb",
+    "mod_assistant/steam.py": "1c4ae121ef1308bc1be729af6a1e0800217e1c8026d6f82d9ff9c32ecb6e9905"
+  },
+  "original_source_hashes_verified": true,
+  "original_executable_sha256_for_reference": "93d75965bdc19e0750d3b98c1c85d9ba23c5c52fa13e2286dd92e84d7ef6135b"
+}
