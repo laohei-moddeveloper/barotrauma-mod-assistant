@@ -64,6 +64,10 @@ class Features:
     globals_written: set[str] = field(default_factory=set)
     code_files: int = 0
     opaque_code: int = 0
+    overrides: set[tuple[str, str, str]] = field(default_factory=set)
+    definition_files: dict[str, list[str]] = field(default_factory=dict)
+    csharp_files: int = 0
+    deferred: bool = False
 
 
 @dataclass
@@ -75,6 +79,8 @@ class Assessment:
     reasons: list[str]
     compared: int = 0
     risky_pairs: int = 0
+    evidence: str = "静态线索"
+    pairs: list[dict] = field(default_factory=list)
 
 
 def workshop_details(env: Environment, ids: list[str], allow_network=True) -> tuple[dict, bool]:
@@ -128,8 +134,14 @@ def _resource_path(folder: Path, name: str, own_name: str) -> Path | None:
 
 
 def _definitions(path: Path, category: str) -> set[tuple[str, str, str]]:
+    return _definition_info(path, category)[0]
+
+
+def _definition_info(path: Path, category: str):
     found = set()
+    overrides = set()
     root = ET.parse(path).getroot()
+    wrapped_elements = {element for node in root.iter() if node.tag.casefold() == 'override' for element in node.iter()}
     candidates = [root] + list(root)
     for child in list(root):
         if child.tag.casefold() == "override":
@@ -147,13 +159,18 @@ def _definitions(path: Path, category: str) -> set[tuple[str, str, str]]:
         else:
             allowed_match = allowed is not None and tag in allowed
         if identifier and allowed_match:
-            found.add((category, element.tag.casefold(), identifier))
-    return found
+            key = (category, element.tag.casefold(), identifier)
+            found.add(key)
+            if element in wrapped_elements: overrides.add(key)
+    return found, overrides
 
 
 def _code_signals(folder: Path, result: Features):
     for path in folder.rglob("*"):
         if not path.is_file():
+            continue
+        if not within(path, folder) or path.is_symlink():
+            result.partial = True
             continue
         suffix = path.suffix.casefold()
         if suffix == ".dll":
@@ -162,6 +179,7 @@ def _code_signals(folder: Path, result: Features):
         if suffix not in (".lua", ".cs"):
             continue
         result.code_files += 1
+        if suffix == ".cs": result.csharp_files += 1
         try:
             if path.stat().st_size > 2_000_000:
                 result.partial = True
@@ -241,7 +259,11 @@ def inspect(mod: Mod, metadata: dict | None = None) -> Features:
                 if path.stat().st_size > 8_000_000:
                     result.partial = True
                     continue
-                result.definitions.update(_definitions(path, tag))
+                definitions, overrides = _definition_info(path, tag)
+                result.definitions.update(definitions)
+                result.overrides.update(overrides)
+                for key in definitions:
+                    result.definition_files.setdefault("|".join(key), []).append(path.relative_to(mod.source).as_posix())
             except (OSError, ET.ParseError):
                 result.partial = True
         _code_signals(mod.source, result)
@@ -268,32 +290,29 @@ def pair_evidence(left: Features, right: Features) -> tuple[int, str]:
     same_names = left.hook_names & right.hook_names
     patches = left.patches & right.patches
     globals_written = left.globals_written & right.globals_written
-    addon = (((ADDON_NAME.search(left.name) or left.name.casefold().startswith("enhanced "))
-              and right.name.casefold() in left.name.casefold())
-             or ((ADDON_NAME.search(right.name) or right.name.casefold().startswith("enhanced "))
-                 and left.name.casefold() in right.name.casefold()))
+    signals=[]
     if same_names:
         example = next(iter(sorted(same_names)))
-        return 3, f"Lua Hook.Add 重复注册 {example[0]}/{example[1]}，名称可能互相覆盖"
+        signals.append((3, f"Lua Hook.Add 重复注册 {example[0]}/{example[1]}，名称可能互相覆盖"))
     if globals_written:
         example = next(iter(sorted(globals_written)))
-        return 2, f"脚本都写入共享变量 {example}，执行顺序可能改变结果"
+        signals.append((2, f"脚本都写入共享变量 {example}，执行顺序可能改变结果"))
     if patches:
         example = next(iter(sorted(patches)))
-        return 2, f"脚本都修改方法 {example[0]}.{example[1]}，需核对补丁顺序"
+        signals.append((2, f"脚本都修改方法 {example[0]}.{example[1]}，需核对补丁顺序"))
     if overlaps:
         example = "、".join(sorted({definition[2] for definition in overlaps})[:2])
         category = "、".join(sorted({definition[0] for definition in overlaps})[:2])
-        if addon:
-            return 1 if len(overlaps) < 20 else 2, (f"配套模组覆盖 {len(overlaps)} 个{category}定义"
-                                                     f"（如 {example}），需按作者说明确定加载顺序")
-        return 2 if len(overlaps) > 1 else 1, (f"重复定义 {len(overlaps)} 个{category}标识"
-                                               f"（如 {example}），可能相互覆盖")
-    return 0, ""
+        unmarked = overlaps - left.overrides - right.overrides
+        if unmarked:
+            signals.append((3, f"同标识普通定义 {len(unmarked)} 个（如 {example}），未声明 Override；排序通常不能解决重复注册"))
+        else:
+            signals.append((1, f"XML 明确声明 Override，涉及 {len(overlaps)} 个{category}定义（如 {example}）；需确认期望覆盖结果"))
+    return max((x[0] for x in signals),default=0), '；'.join(x[1] for x in signals)
 
 
 def evaluate(mods: list[Mod], features: dict[str, Features],
-             runtime_luacs: bool | None = None) -> dict[str, Assessment]:
+             runtime_luacs: bool | None = None, order=None, csharp=None) -> dict[str, Assessment]:
     active = {mod.item_id for mod in mods if mod.enabled}
     names = {feature.name.casefold(): item for item, feature in features.items()}
     pair_signals = defaultdict(list)
@@ -323,6 +342,9 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
         if runtime_luacs is False and feature.code_files:
             reasons.append(f"含 {feature.code_files} 个 Lua/C# 文件；本机游戏主程序未检出 LuaCs，脚本功能需先核实")
             severity = max(severity, 3)
+        if csharp is False and feature.csharp_files:
+            reasons.append("含 C# 源码，但永久 C# 设置未开启；请核实运行条件")
+            severity = max(severity, 3)
         signals = sorted(pair_signals[mod.item_id],
                          key=lambda value: (-int(value[1].item_id in active), -value[0], value[1].name))
         for score, other, reason in signals[:4]:
@@ -340,6 +362,8 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
                     severity = max(severity, 1)
         if feature.partial:
             reasons.append("部分资源未能分析，结论不完整")
+        if feature.deferred:
+            reasons.append("游戏运行中的轻量检测：深度扫描已延后，缓存结果可能过时")
         if feature.opaque_code:
             reasons.append("含编译后的程序库，部分内部行为无法仅凭文本资源判断")
         if not reasons:
@@ -354,14 +378,45 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
             importance = "中"
         max_signal = max((score for score, _, _ in signals), default=0)
         active_signal = max((score for score, other, _ in signals if other.item_id in active), default=0)
-        compatibility = ("低·运行条件" if runtime_luacs is False and feature.code_files else
+        compatibility = ("低·运行条件" if (runtime_luacs is False and feature.code_files or csharp is False and feature.csharp_files) else
                          "低·缺前置" if missing or any("资源路径需要" in text for text in reasons) else
                          "低·当前冲突风险" if mod.enabled and active_signal >= 3 else
                          "低·潜在冲突风险" if max_signal >= 3 else
                          "中·当前重叠" if mod.enabled and active_signal >= 2 else
                          "中·潜在重叠" if max_signal >= 2 else
                          "中·需核对" if severity == 1 else
-                         "未知·资料不足" if feature.partial else "高·未见冲突")
+                         "未知·资料不足" if feature.partial or feature.opaque_code else "高·未见冲突")
+        if feature.deferred: compatibility='待刷新·缓存结论'
         result[mod.item_id] = Assessment(mod.item_id, feature.kinds, importance,
                                          compatibility, reasons, max(0, len(mods) - 1), len(signals))
+        result[mod.item_id].evidence = "缓存待刷新" if feature.deferred else "资料不完整" if feature.partial or feature.opaque_code else "已读取文件事实，兼容结论仍需实测"
+        result[mod.item_id].pairs = [pair_detail(feature, features.get(other.item_id, Features(other.item_id, other.name)),
+                                               order or [], other.item_id in active) for _, other, _ in signals]
     return result
+
+
+def pair_detail(left, right, order, other_active=True):
+    score, reason = pair_evidence(left, right)
+    shared = left.definitions & right.definitions
+    winner = ""
+    if shared and shared <= left.overrides | right.overrides:
+        left_only = shared <= left.overrides and not shared & right.overrides
+        right_only = shared <= right.overrides and not shared & left.overrides
+        if left_only: winner = left.name
+        elif right_only: winner = right.name
+        elif shared <= left.overrides & right.overrides and left.item_id in order and right.item_id in order:
+            winner = left.name if order.index(left.item_id) < order.index(right.item_id) else right.name
+    if shared - left.overrides - right.overrides:
+        advice = "同标识普通定义需兼容补丁或禁用其中一个；移动顺序通常不足以解决。"
+    elif winner:
+        advice = f"可识别的 XML Override 预计由 {winner} 优先；请确认这符合你的期望，多个 Override 可调整相对顺序。"
+    else:
+        advice = "按作者说明核对脚本/覆盖顺序，分组启用实测；助手不会自动禁用模组。"
+    locations = []
+    for key in sorted(shared)[:12]:
+        locations.append({'identifier': key[2], 'category': key[0],
+                          'left_files': left.definition_files.get('|'.join(key), []),
+                          'right_files': right.definition_files.get('|'.join(key), [])})
+    return {'other_id': right.item_id, 'other_name': right.name, 'other_enabled': other_active,
+            'score': score, 'reason': reason, 'evidence': 'XML 文件事实' if shared else '源码静态线索',
+            'expected_xml_winner': winner, 'advice': advice, 'locations': locations}

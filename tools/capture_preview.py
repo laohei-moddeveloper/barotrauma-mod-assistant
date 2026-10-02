@@ -6,6 +6,7 @@ import tkinter as tk
 from PIL import ImageGrab
 from mod_assistant.app import App
 from mod_assistant.order_ui import OrderDialog
+from mod_assistant.management_ui import ManagementDialog
 from mod_assistant.core import atomic_json
 
 root = tk.Tk()
@@ -27,7 +28,7 @@ def capture():
             path = Path(__file__).resolve().parents[1] / "Research" / name
             picture.save(path)
             print(path, picture.size)
-        snap(root, "ui-preview-v3.png")
+        snap(root, "ui-preview-v4.png")
         config = app.env.game / "config_player.xml"
         original = config.read_bytes()
         dialog = OrderDialog(app)
@@ -46,13 +47,16 @@ def capture():
         assert set(dialog.ids) == set(before)
         assert config.read_bytes() == original
         def finish():
-            snap(dialog.window, "ui-order-v3.png")
-            atomic_json(Path(__file__).resolve().parents[1] / "Research/ui-order-check.json",
+            snap(dialog.window, "ui-order-v4.png")
+            atomic_json(Path(__file__).resolve().parents[1] / "Research/ui-order-check-v4.json",
                         {"ok": True, "enabled_regular_mods": len(before), "drag_test": len(before) > 1,
                          "automatic_preview": True, "live_configuration_unchanged": True})
             dialog.window.destroy()
-            root.attributes("-topmost", False)
-            app.close()
+            manager=ManagementDialog(app); manager.window.attributes('-topmost',True)
+            def finish_manager():
+                snap(manager.window,'ui-manager-v4.png'); manager.window.destroy()
+                root.attributes("-topmost", False); app.close()
+            root.after(400,finish_manager)
         root.after(400, finish)
     elif count[0] > 300:
         print("UI preview timed out")

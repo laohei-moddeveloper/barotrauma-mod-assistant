@@ -4,7 +4,8 @@ import ctypes as C
 import os
 from pathlib import Path
 import threading
-from .core import APP_ID, AssistantError, Environment
+import time
+from .core import APP_ID, AssistantError, Cancelled, Environment, game_running
 
 SUBSCRIBED, INSTALLED, NEEDS_UPDATE, DOWNLOADING, PENDING = 1, 4, 8, 16, 32
 BUSY = NEEDS_UPDATE | DOWNLOADING | PENDING
@@ -51,6 +52,10 @@ class SteamBridge:
             if not self.ugc:
                 raise AssistantError("Steam 工坊接口不可用，请更新 Steam 客户端")
             utils = self.bind("SteamAPI_SteamUtils_v010", C.c_void_p, [])()
+            self.utils = utils
+            self.subscribe_item = self.bind('SteamAPI_ISteamUGC_SubscribeItem', C.c_uint64, [C.c_void_p,C.c_uint64])
+            self.call_completed = self.bind('SteamAPI_ISteamUtils_IsAPICallCompleted', C.c_bool,
+                                           [C.c_void_p,C.c_uint64,C.POINTER(C.c_bool)])
             app = self.bind("SteamAPI_ISteamUtils_GetAppID", C.c_uint32, [C.c_void_p])(utils)
             if app != APP_ID:
                 raise AssistantError("Steam 工坊连接的游戏编号不正确")
@@ -110,6 +115,25 @@ class SteamBridge:
         with self.lock:
             available = self.get_download(self.ugc, int(item_id), C.byref(downloaded), C.byref(total))
         return (downloaded.value, total.value) if available else (0, 0)
+
+    def subscribe(self, item_id, cancel=None, timeout=60, process_guard=game_running):
+        if not item_id.isdecimal() or not 0<int(item_id)<2**64: raise AssistantError('工坊编号无效')
+        if process_guard(): raise AssistantError('请先关闭游戏，再订阅并配齐联机模组')
+        if self.state(item_id) & SUBSCRIBED: return False
+        with self.lock: call=self.subscribe_item(self.ugc,int(item_id))
+        if not call: raise AssistantError('Steam 未接受模组订阅请求')
+        started=time.monotonic()
+        while time.monotonic()-started<timeout:
+            if cancel and cancel.is_set(): raise Cancelled('订阅等待已停止，已接受的订阅可能继续')
+            if process_guard(): raise AssistantError('游戏刚刚启动，已停止联机配置任务')
+            self.pump(); failed=C.c_bool()
+            with self.lock: completed=self.call_completed(self.utils,call,C.byref(failed))
+            if completed:
+                if failed.value: raise AssistantError('Steam 订阅请求失败，请检查登录和网络')
+                if self.state(item_id)&SUBSCRIBED: return True
+                raise AssistantError('Steam 未确认订阅，请核实此工坊项目属于潜渊症且有访问权限')
+            time.sleep(0.1)
+        raise AssistantError('等待 Steam 订阅超时；启用配置未切换')
 
     def installation(self, item_id: str) -> tuple[Path, int]:
         if not self.ready(item_id):

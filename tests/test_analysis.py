@@ -51,7 +51,7 @@ class AnalysisTests(unittest.TestCase):
                           'Hook.Patch("Barotrauma.Character", "ApplyDamage", function() end)')
         features = {m.item_id: inspect(m) for m in (a, b)}
         score, reason = pair_evidence(features["101"], features["102"])
-        self.assertEqual(score, 2)
+        self.assertEqual(score, 3)
         self.assertIn("applydamage", reason)
         self.assertEqual(len(features["101"].definitions & features["102"].definitions), 2)
 

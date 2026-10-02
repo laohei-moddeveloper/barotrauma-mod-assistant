@@ -23,6 +23,11 @@ from .mod_toggle import enabled_ids, set_enabled
 from .mod_order import read_order
 from .order_ui import OrderDialog
 from .luacs import LuaCsInstaller, status as luacs_status
+from .analysis_cache import inspect_cached
+from .management_ui import ManagementDialog
+from .profiles import capture_profile, normalize_profile, resolve_profile
+from .snapshots import SnapshotStore
+from .diagnostics import diagnose, recent_logs, lua_verification
 from .steam import BUSY, DOWNLOADING, NEEDS_UPDATE, PENDING, SteamBridge
 
 STATE = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "BarotraumaModAssistant"
@@ -48,6 +53,7 @@ class App:
         self.metadata = {}
         self.online = False
         self.runtime_luacs = None
+        self.runtime_csharp = None
         self.luacs_text = tk.StringVar(value="LuaCs 状态待检测")
         self.selected = set()
         self.env = None
@@ -71,6 +77,8 @@ class App:
         self.download_slots = tk.IntVar(value=self.settings.get("download_slots", 4))
         self.install_slots = tk.IntVar(value=self.settings.get("install_slots", 3))
         self.timeout = tk.IntVar(value=self.settings.get("timeout", 180))
+        self.auto_snapshot = tk.BooleanVar(value=self.settings.get('auto_snapshot', True))
+        self.light_detection = tk.BooleanVar(value=self.settings.get('light_detection', True))
         self.search = tk.StringVar()
         self.busy_buttons = []
         self.make_style()
@@ -144,6 +152,16 @@ class App:
         self.label(scripting, textvariable=self.luacs_text, fg=MUTED).pack(side="left")
         self.button(scripting, "恢复 LuaCs 安装前", self.restore_luacs).pack(side="right")
         self.button(scripting, "一键安装 LuaCs + C#", self.install_luacs).pack(side="right", padx=(0, 10))
+        features = tk.Frame(self.root, bg=BG, padx=26, pady=4)
+        features.pack(fill='x')
+        for title,command in [('配置 / 联机 / 快照',self.show_management),('完整重新分析',lambda:self.scan(force=True)),
+                              ('日志诊断',self.diagnose_logs),('选择日志',lambda:self.diagnose_logs(choose=True)),
+                              ('LuaCs 验证指引',self.verify_luacs)]:
+            self.button(features,title,command).pack(side='left',padx=(0,8))
+        for title,variable in [('更新前快照',self.auto_snapshot),('游玩时轻量检测',self.light_detection)]:
+            checkbox=tk.Checkbutton(features,text=title,variable=variable,bg=BG,fg=MUTED,selectcolor=PANEL,
+                                    activebackground=BG,activeforeground=TEXT,font=('Microsoft YaHei UI',9))
+            checkbox.pack(side='left',padx=(5,0)); self.busy_buttons.append(checkbox)
 
         self.label(self.root, "Steam 负责实际网络调度；停止助手不会强制取消 Steam 已提交的下载。",
                    fg=MUTED, font=("Microsoft YaHei UI", 9)).pack(side="bottom", anchor="w", padx=26, pady=(4, 6))
@@ -231,6 +249,7 @@ class App:
         return data.get("fingerprint", "")
 
     def set_busy(self, busy):
+        self.busy_buttons = [button for button in self.busy_buttons if button.winfo_exists()]
         for button in self.busy_buttons:
             button.configure(state="disabled" if busy else "normal")
         self.stop_button.configure(state="normal" if busy else "disabled")
@@ -253,7 +272,8 @@ class App:
         self.worker = threading.Thread(target=run, name="AssistantWorker", daemon=False)
         self.worker.start()
 
-    def scan(self):
+    def scan(self, force=False):
+        lightweight = self.light_detection.get()
         self.status.set("正在检测游戏目录、模组缓存与 Steam 状态…")
 
         def detect():
@@ -267,10 +287,15 @@ class App:
                              "游戏正在运行：只读检测模组；更新和启用切换需关闭游戏" if running else
                              "正在读取本地模组与启用状态…"})
             mods = inventory(env)
+            light = bool(running is not False and lightweight)
+            if force and running is not False:
+                raise AssistantError('请先关闭游戏和服务器，再完整重新分析')
             self.events.put({"kind": "scan_status", "message": "正在读取 Steam 工坊状态…"})
             online = False
             bridge = None
             try:
+                if light:
+                    raise AssistantError('游戏运行中：轻量模式暂不查询 Steam 工坊')
                 bridge = SteamBridge(env).connect()
                 bridge.pump()
                 subscribed = bridge.subscribed()
@@ -297,20 +322,68 @@ class App:
                 if bridge:
                     bridge.close()
             self.events.put({"kind": "scan_status", "message": "正在读取模组公开资料…"})
-            metadata, metadata_available = workshop_details(env, [mod.item_id for mod in mods])
+            metadata, metadata_available = workshop_details(env, [mod.item_id for mod in mods], allow_network=not light)
             self.events.put({"kind": "scan_status", "message":
                              f"正在比对 {len(mods)} 个模组的资源和代码…"})
-            features = inspect_all(mods, metadata)
-            runtime_luacs = luacs_runtime_detected(env)
-            assessments = evaluate(mods, features, runtime_luacs)
+            analysis_mods = [replace(mod,source=env.installed/mod.item_id)
+                             if mod.item_id.isdecimal() and (env.installed/mod.item_id/'filelist.xml').is_file() else mod for mod in mods]
+            features,stats = inspect_cached(env,analysis_mods,metadata,light,force,self.cancel,
+                                            lambda message:self.events.put({'kind':'scan_status','message':message}))
+            detected = luacs_status(env)
+            runtime_luacs = detected.runtime
+            assessments = evaluate(mods, features, runtime_luacs, read_order(env,strict=False), detected.csharp)
             self.events.put({"kind": "inventory", "env": env, "mods": mods, "online": online,
                              "metadata": metadata, "features": features,
                              "assessments": assessments, "runtime_luacs": runtime_luacs,
                              "game_running": running,
-                             "luacs_status": luacs_status(env).text,
+                             "luacs_status": detected.text, 'runtime_csharp':detected.csharp,
+                             'analysis_stats':stats, 'light':light,
                              "metadata_available": metadata_available})
 
         self.work(detect)
+
+    def evaluate_current(self):
+        return evaluate([data['mod'] for data in self.mods.values()],self.features,self.runtime_luacs,
+                        read_order(self.env,strict=False),self.runtime_csharp)
+
+    def show_management(self):
+        if self.env: ManagementDialog(self)
+
+    def text_report(self,title,text):
+        dialog=tk.Toplevel(self.root); dialog.title(title); dialog.geometry('900x650'); dialog.configure(bg=BG)
+        panel=tk.Frame(dialog,bg=BG,padx=15,pady=15); panel.pack(fill='both',expand=True)
+        scrollbar=ttk.Scrollbar(panel); scrollbar.pack(side='right',fill='y')
+        content=tk.Text(panel,bg=PANEL,fg=TEXT,wrap='word',relief='flat',padx=12,pady=12,
+                        font=('Microsoft YaHei UI',10),yscrollcommand=scrollbar.set)
+        content.pack(fill='both',expand=True); scrollbar.configure(command=content.yview)
+        content.insert('1.0',text); content.configure(state='disabled')
+
+    def diagnose_logs(self,choose=False):
+        if not self.env: return
+        logs=recent_logs(self.env)
+        path=filedialog.askopenfilename(title='选择游戏、LuaCs 或服务器日志',filetypes=[('日志','*.log *.txt'),('所有文件','*.*')],parent=self.root) if choose or not logs else logs[0]
+        if not path: return
+        mods=[data['mod'] for data in self.mods.values()]
+        summary=self.last_summary
+        def work():
+            report=diagnose(path,mods,self.env)
+            lines=[report['file'],report['note'],'']
+            if summary and summary.get('errors'):
+                lines+=['最近助手更新未完成项：']+[f'{item}：{error}' for item,error in summary['errors'].items()]+['']
+            for finding in report['findings']:
+                lines += [f"[{finding['category']}] 片段行 {finding['line_in_tail']}",finding['evidence'],
+                          '可能相关模组：'+('、'.join(finding['possible_mods']) or '未确定'),finding['text'],
+                          '建议：'+finding['advice'],'']
+            if not report['findings']: lines.append('读取片段未发现已识别的错误关键词；这不代表游戏运行无错误。')
+            self.events.put({'kind':'text_report','title':'游戏 / LuaCs 日志诊断','text':'\n'.join(lines)})
+        self.work(work)
+
+    def verify_luacs(self):
+        if not self.env: return
+        report=lua_verification(self.env)
+        self.text_report('LuaCs 安装后验证', '\n'.join([report['disk_status']['text'],
+                         '当前为磁盘检测；尚未由助手确认游戏内脚本运行成功。','']+
+                         [f'{i}. {line}' for i,line in enumerate(report['instructions'],1)]+['',report['official_guide']]))
 
     def render(self):
         highlighted = self.tree.selection()
@@ -417,11 +490,16 @@ class App:
                  "类型：" + "、".join(assessment.kinds),
                  "重要程度（内容影响范围）：" + assessment.importance,
                  "兼容等级：" + assessment.compatibility,
+                 '证据状态：'+assessment.evidence,
                  f"已比对 {assessment.compared} 个其他模组，其中 {assessment.risky_pairs} 对存在可解释的重叠信号。",
                  f"资源定义：{len(feature.definitions)} 个；Lua/C# 源文件：{feature.code_files} 个；"
                  f"识别到的方法补丁：{len(feature.patches)} 个；Hook.Add：{len(feature.hook_names)} 个。",
                  ""]
         lines += [f"{number}. {reason}" for number, reason in enumerate(assessment.reasons, 1)]
+        for pair in assessment.pairs:
+            lines += ['', '与 '+pair['other_name']+'：'+pair['reason'], '依据：'+pair['evidence'], '处理建议：'+pair['advice']]
+            for location in pair['locations']:
+                lines.append(f"  {location['category']}/{location['identifier']} · 本模组 {', '.join(location['left_files']) or '未知路径'} · 对方 {', '.join(location['right_files']) or '未知路径'}")
         lines += ["", "这是静态风险筛查。相同标识或方法补丁也可能是作者有意配合；最终仍需按作者说明设置顺序并在游戏内测试。"]
         dialog = tk.Toplevel(self.root)
         dialog.title("模组分析 · " + mod.name)
@@ -455,6 +533,7 @@ class App:
             rows.append({"id": item, "name": data["mod"].name, "enabled": data["mod"].enabled,
                          "types": assessment.kinds, "importance": assessment.importance,
                          "compatibility": assessment.compatibility, "reasons": assessment.reasons,
+                         'evidence':assessment.evidence, 'pair_details':assessment.pairs,
                          "compared": assessment.compared, "overlapping_pairs": assessment.risky_pairs,
                          "xml_definitions": len(feature.definitions), "code_files": feature.code_files,
                          "method_patches": len(feature.patches), "hook_registrations": len(feature.hook_names),
@@ -485,8 +564,9 @@ class App:
                 {"kind": "scan_status", "message": message}))
             installer.cancel = self.cancel
             result = installer.install()
+            detected = luacs_status(self.env)
             self.events.put({"kind": "luacs_ready", "result": result,
-                             "status": luacs_status(self.env).text, "runtime": True})
+                             "status": detected.text, "runtime": detected.runtime, 'csharp':detected.csharp})
         self.work(install)
 
     def restore_luacs(self):
@@ -496,6 +576,7 @@ class App:
             LuaCsInstaller(self.env).restore()
             detected = luacs_status(self.env)
             self.events.put({"kind": "luacs_ready", "runtime": detected.runtime,
+                             'csharp':detected.csharp,
                              "status": detected.text, "result": {
                                  "message": "已恢复 LuaCs 安装前的文件与设置", "backup": ""}})
         self.work(restore)
@@ -512,19 +593,20 @@ class App:
         if self.env is None or item not in self.mods:
             return
         desired = not self.mods[item]["mod"].enabled
+        downloads,installs,timeout = self.download_slots.get(),self.install_slots.get(),self.timeout.get()
         self.status.set(("正在启用：" if desired else "正在禁用：") + self.mods[item]["mod"].name)
 
         def change():
             if desired and item.isdecimal() and not (self.env.installed / item / "filelist.xml").is_file():
                 engine = UpdateEngine(self.env, self.events.put,
-                                      self.download_slots.get(), self.install_slots.get(), self.timeout.get())
+                                      downloads, installs, timeout)
                 self.engine = engine
                 engine.cancel = self.cancel
                 summary = engine.run([item], online=self.online)
                 if item in summary["errors"]:
                     raise AssistantError(summary["errors"][item])
             changed = set_enabled(self.env, item, desired, source=self.mods[item]["mod"].source)
-            source = self.env.cache(item) if item.isdecimal() else self.mods[item]["mod"].source
+            source = self.env.installed/item if item.isdecimal() else self.mods[item]["mod"].source
             feature = inspect(replace(self.mods[item]["mod"], source=source),
                               self.metadata.get(item))
             self.events.put({"kind": "enabled", "id": item, "enabled": desired,
@@ -547,6 +629,8 @@ class App:
             messagebox.showerror("设置无效", "并行数量和超时必须是数字。", parent=self.root)
             return
         self.settings.update(download_slots=downloads, install_slots=installs, timeout=timeout)
+        automatic_snapshot=self.auto_snapshot.get()
+        self.settings.update(auto_snapshot=automatic_snapshot,light_detection=self.light_detection.get())
         atomic_json(self.settings_file, self.settings)
         ids = list(self.selected)
         self.stage_log.clear()
@@ -554,13 +638,18 @@ class App:
         self.log("开始并行更新" if online else "开始安装完整本地缓存，不联网检查新版本")
 
         def update():
+            store=SnapshotStore(self.env,lambda message:self.events.put({'kind':'scan_status','message':message}),cancel=self.cancel)
+            if automatic_snapshot:
+                snapshot=store.capture('更新前',targets=ids)
+                self.events.put({'kind':'log','message':'更新前快照已就绪：'+snapshot['id']})
+            else: store.recover()
             self.engine = UpdateEngine(self.env, self.events.put, downloads, installs, timeout)
             self.engine.cancel = self.cancel
             summary = self.engine.run(ids, online)
             refreshed = {}
             for item in summary["completed"]:
                 mod = self.mods[item]["mod"]
-                refreshed[item] = inspect(replace(mod, source=self.env.cache(item)),
+                refreshed[item] = inspect(replace(mod, source=self.env.installed/item),
                                           self.metadata.get(item))
             if refreshed:
                 self.events.put({"kind": "analyses", "features": refreshed})
@@ -617,49 +706,29 @@ class App:
         path = filedialog.asksaveasfilename(title="导出联机清单", defaultextension=".json",
                                            initialfile="潜渊症联机模组清单.json", parent=self.root)
         if path:
-            entries = []
-            for item in self.mods:
-                if item not in self.selected:
-                    continue
-                mod = self.mods[item]["mod"]
-                fingerprint = self.verified_fingerprint(item)
-                entries.append({"id": item, "name": mod.name, "mod_version": mod.mod_version,
-                                "cache_manifest": self.env.record(item).get("manifest", ""),
-                                "assistant_fingerprint": fingerprint})
-            atomic_json(Path(path), {"schema": "barotrauma-mod-assistant-profile-v1", "appid": 602960,
-                                     "note": "助手文件指纹不是游戏联机内容哈希；游戏仍会验证完整内容。",
-                                     "load_order": read_order(self.env, strict=False),
-                                     "mods": entries})
-            self.log("已导出所选模组的联机清单。")
+            def export():
+                atomic_json(Path(path), capture_profile(self.env, '当前联机配置'))
+                self.events.put({'kind':'log','message':'已导出当前启用配置，包含核心包、实际顺序和已安装版本。'})
+            self.work(export)
 
     def compare_profile(self):
         path = filedialog.askopenfilename(title="选择房主导出的联机清单", filetypes=[("模组清单", "*.json")], parent=self.root)
         if not path or self.env is None:
             return
         try:
-            data = json.loads(Path(path).read_text(encoding="utf-8-sig"))
-            if data.get("schema") != "barotrauma-mod-assistant-profile-v1" or data.get("appid") != 602960:
-                raise AssistantError("这不是助手支持的潜渊症联机清单")
-            lines = []
-            if "load_order" in data and data["load_order"] != read_order(self.env, strict=False):
-                lines.append("已启用模组的加载顺序或启用清单不同")
-            for entry in data["mods"]:
-                item = str(entry["id"])
-                local = self.mods.get(item)
-                if local is None:
-                    lines.append(f'缺少：{entry.get("name", item)}')
-                    continue
-                if local["mod"].mod_version != entry.get("mod_version"):
-                    lines.append(f'版本不同：{local["mod"].name}')
-                if self.env.record(item).get("manifest") != entry.get("cache_manifest"):
-                    lines.append(f'缓存修订不同：{local["mod"].name}')
-                if entry.get("assistant_fingerprint"):
-                    value = self.verified_fingerprint(item)
-                    if value != entry["assistant_fingerprint"]:
-                        lines.append(f'文件指纹不同或未校验：{local["mod"].name}')
-            text = "\n".join(lines) if lines else "缓存版本与清单一致；游戏仍会检查内容哈希、依赖和加载顺序。"
-            self.log(text)
-            messagebox.showinfo("联机清单对比", text[:3500], parent=self.root)
+            if Path(path).stat().st_size > 2*1024*1024: raise AssistantError('配置文件过大')
+            data = normalize_profile(json.loads(Path(path).read_text(encoding="utf-8-sig")))
+            def compare():
+                resolved,missing,lines=resolve_profile(self.env,data)
+                lines=[f'缺少：{entry.get("name",entry["id"])}' for entry in missing]+lines
+                current=capture_profile(self.env)
+                proposed=[resolved[x['id']].item_id for x in data['order'] if x['id'] in resolved]
+                if proposed != [x['id'] for x in current['order']]: lines.append('启用清单或加载顺序不同')
+                core=resolved[data['core']['id']].item_id if data.get('core') and data['core']['id'] in resolved else None
+                if core != (current['core']['id'] if current.get('core') else None): lines.append('核心内容包不同')
+                text='\n'.join(lines) if lines else '已安装版本、启用配置与清单一致；游戏仍需校验实际内容哈希。'
+                self.events.put({'kind':'text_report','title':'联机清单对比','text':text})
+            self.work(compare)
         except Exception as error:
             messagebox.showerror("无法读取清单", str(error), parent=self.root)
 
@@ -692,6 +761,8 @@ class App:
                 self.metadata = event["metadata"]
                 self.online = event["online"]
                 self.runtime_luacs = event["runtime_luacs"]
+                self.runtime_csharp = event['runtime_csharp']
+                self.analysis_stats=event['analysis_stats']
                 self.luacs_text.set(event["luacs_status"])
                 self.selected = ((previous_selection & set(self.mods)) if previous_selection is not None
                                  else {item for item in self.mods if item.isdecimal()})
@@ -701,6 +772,11 @@ class App:
                                 (" · 游戏运行中（仅检测）" if event["game_running"] else "") +
                                 f" · 游戏：{self.env.game}")
                 self.log("本机检测完成。完整缓存可以直接安装，不需要先删除重下。")
+                stats=event['analysis_stats']
+                self.log(f"分析缓存：复用 {stats['reused']} 个，分析变化 {stats['scanned']} 个，待完整检测 {stats['deferred']} 个。")
+                if event['light']:
+                    self.status.set(self.status.get()+' · 轻量检测，兼容资料待刷新')
+                    self.log('游戏运行中没有遍历模组资源或读取脚本；已有分析仅作参考，关闭游戏后重新检测更新结论。')
                 if not event["metadata_available"]:
                     self.log("工坊公开资料暂不可用；类型和兼容性主要根据本地资源分析。")
                 changed = True
@@ -713,22 +789,22 @@ class App:
                 self.arrange_mods(read_order(self.env, strict=False))
                 mod.source = self.env.cache(item) if item.isdecimal() else mod.source
                 self.features[item] = event["feature"]
-                self.assessments = evaluate([data["mod"] for data in self.mods.values()],
-                                            self.features, self.runtime_luacs)
+                self.assessments = self.evaluate_current()
                 action = "启用" if event["enabled"] else "禁用"
                 self.status.set(f"{mod.name} 已{action}；下次启动游戏后生效")
                 self.log(self.status.get())
                 changed = True
             elif kind == "order_saved":
                 self.arrange_mods(event["ids"])
+                self.assessments = self.evaluate_current()
                 self.status.set("模组加载顺序已保存；下次启动游戏生效")
                 self.log(self.status.get() + (" · 原配置已备份" if event["backup"] else " · 顺序未变化"))
                 changed = True
             elif kind == "luacs_ready":
                 self.runtime_luacs = event["runtime"]
+                self.runtime_csharp = event['csharp']
                 self.luacs_text.set(event["status"])
-                self.assessments = evaluate([data["mod"] for data in self.mods.values()],
-                                            self.features, self.runtime_luacs)
+                self.assessments = self.evaluate_current()
                 self.status.set(event["result"]["message"])
                 self.log(self.status.get())
                 if event["result"]["backup"]:
@@ -737,9 +813,17 @@ class App:
                 changed = True
             elif kind == "analyses":
                 self.features.update(event["features"])
-                self.assessments = evaluate([data["mod"] for data in self.mods.values()],
-                                            self.features, self.runtime_luacs)
+                self.assessments = self.evaluate_current()
                 changed = True
+            elif kind == 'text_report':
+                self.text_report(event['title'],event['text'])
+            elif kind == 'ui_callback':
+                event['callback']()
+            elif kind == 'operation_done':
+                result=event['result']; self.log(result.get('message','快照恢复完成；下次启动游戏生效'))
+                if result.get('snapshot'): self.log('恢复点：'+result['snapshot'])
+                if result.get('backup'): self.log('原文件已备份：'+result['backup'])
+                self.refresh_after_idle=True
             elif kind == "item":
                 item = event["id"]
                 if item in self.mods:
@@ -780,6 +864,8 @@ class App:
         self.root.after(80, self.drain)
 
     def close(self):
+        self.settings.update(auto_snapshot=self.auto_snapshot.get(),light_detection=self.light_detection.get())
+        atomic_json(self.settings_file,self.settings)
         if self.worker and self.worker.is_alive():
             self.stop()
             self.root.after(120, self.finish_close)
@@ -825,18 +911,25 @@ def self_check(report_path):
                 dialog = OrderDialog(app)
                 assert dialog.ids == order
                 dialog.window.destroy()
+                manager=ManagementDialog(app)
+                assert manager.profile_list.winfo_exists() and manager.snapshot_list.winfo_exists()
+                manager.window.destroy()
+                assert all(value.evidence for value in app.assessments.values())
             except Exception as error:
                 errors.append(repr(error))
             atomic_json(Path(report_path), {"ok": not errors, "errors": errors,
                         "mods": len(app.mods), "status": app.status.get(), "version": VERSION,
                         "analyzed": len(app.assessments),
+                        'seconds':round(time.monotonic()-started,3),
+                        'analysis_cache':app.analysis_stats,
                         "load_order": read_order(app.env, strict=False),
                         "luacs": asdict(luacs_status(app.env)),
                         "enabled": sum(data["mod"].enabled for data in app.mods.values()),
                         "frozen": bool(getattr(sys, "frozen", False))})
             app.close()
-        elif errors or time.monotonic() - started > 30:
-            atomic_json(Path(report_path), {"ok": False, "errors": errors or ["检测超时"]})
+        elif errors or time.monotonic() - started > 180:
+            atomic_json(Path(report_path), {"ok": False, "errors": errors or ["检测超时"],
+                                           'last_status':app.status.get()})
             app.close()
         else:
             root.after(100, finish)

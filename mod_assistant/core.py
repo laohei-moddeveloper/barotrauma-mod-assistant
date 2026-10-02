@@ -296,11 +296,13 @@ def inventory(env: Environment) -> list[Mod]:
         if folder.is_dir():
             ids.update(p.name for p in folder.iterdir() if p.is_dir() and p.name.isdecimal())
     mods = []
+    if env.installed.is_dir():
+        ids.update(p.name for p in env.installed.iterdir() if p.is_dir() and p.name.isdecimal())
     for item_id in sorted(ids, key=int):
         source = env.cache(item_id)
         mod = Mod(item_id, item_id, source, enabled=item_id in enabled)
         try:
-            root = load_package(source)
+            root = load_package(source or env.installed/item_id)
             mod.name = root.get("name", item_id)
             mod.mod_version = root.get("modversion", "")
             mod.game_version = root.get("gameversion", "")
@@ -310,9 +312,10 @@ def inventory(env: Environment) -> list[Mod]:
             target = env.installed / item_id
             if target.is_dir():
                 destination = load_package(target)
+                mod.name = destination.get('name',mod.name)
                 mod.installed_version = destination.get("modversion", "")
                 current_time = int(destination.get("installtime", 0))
-                mod.status = "已安装 / 待联网核对" if (
+                mod.status = "已安装 / 无 Steam 缓存" if source is None else "已安装 / 待联网核对" if (
                     current_time >= record.get("timeupdated", 0)
                     and mod.installed_version == mod.mod_version) else "本地副本待同步"
             else:
