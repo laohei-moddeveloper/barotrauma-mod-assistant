@@ -45,6 +45,7 @@ class OrderDialog:
             app.button(buttons, title, command, primary=title.startswith("保存"), busy=False).pack(
                 side="left", padx=(0, 10))
         self.render()
+        app.skin(self.window)
 
     def render(self, selected=None):
         self.list.delete(0, "end")
@@ -136,7 +137,7 @@ class OrderDialog:
         for title,command in [('添加规则',add),('删除选中规则',remove),('保存规则',commit)]:
             self.app.button(buttons,title,command,busy=False).pack(side='left',padx=(0,10))
         def close(): window.destroy(); self.window.grab_set()
-        window.protocol('WM_DELETE_WINDOW',close); refresh()
+        window.protocol('WM_DELETE_WINDOW',close); refresh(); self.app.skin(window)
 
     def automatic(self):
         try:

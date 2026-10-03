@@ -19,6 +19,9 @@ class UiTests(Fixture):
         self.app.assessments=self.app.evaluate_current(); self.app.render()
 
     def tearDown(self):
+        for callback in self.root.tk.call('after','info'):
+            self.root.after_cancel(callback)
+        self.root.update_idletasks()
         self.root.destroy()
         for handler in list(self.app.logger.handlers):
             handler.close(); self.app.logger.removeHandler(handler)

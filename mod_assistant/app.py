@@ -29,6 +29,8 @@ from .profiles import capture_profile, normalize_profile, resolve_profile
 from .snapshots import SnapshotStore
 from .diagnostics import diagnose, recent_logs, lua_verification
 from .steam import BUSY, DOWNLOADING, NEEDS_UPDATE, PENDING, SteamBridge
+from .appearance import Appearance
+from .main_ui import MainInterface
 
 STATE = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "BarotraumaModAssistant"
 BG, PANEL, TEXT, MUTED, ACCENT = "#0b1422", "#142237", "#e8f0fa", "#8fa6bf", "#57dac4"
@@ -38,8 +40,6 @@ class App:
     def __init__(self, root, auto_scan=True):
         self.root = root
         self.root.title(f"潜渊症 · 模组更新助手 {VERSION}")
-        self.root.geometry("1420x820")
-        self.root.minsize(1000, 700)
         self.root.configure(bg=BG)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.root.report_callback_exception = self.callback_error
@@ -66,6 +66,15 @@ class App:
             self.settings = json.loads(self.settings_file.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             self.settings = {}
+        if not isinstance(self.settings,dict): self.settings = {}
+        self.appearance=Appearance(self.settings.get('appearance'))
+        screen_width,screen_height=self.root.winfo_screenwidth(),self.root.winfo_screenheight()
+        size=self.settings.get('window_size',[1360,800])
+        if not isinstance(size,list) or len(size)!=2 or any(type(value) is not int for value in size): size=[1360,800]
+        available_width,available_height=max(1,screen_width-50),max(1,screen_height-80)
+        minimum_width,minimum_height=min(1000,available_width),min(680,available_height)
+        self.root.minsize(minimum_width,minimum_height)
+        self.root.geometry(f'{max(minimum_width,min(size[0],available_width))}x{max(minimum_height,min(size[1],available_height))}')
         self.logger = logging.getLogger("mod_assistant")
         self.logger.setLevel(logging.INFO)
         if not self.logger.handlers:
@@ -88,17 +97,15 @@ class App:
             self.root.after(120, self.scan)
 
     def make_style(self):
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("Treeview", background=PANEL, fieldbackground=PANEL, foreground=TEXT,
-                        rowheight=30, borderwidth=0, font=("Microsoft YaHei UI", 10))
-        style.configure("Treeview.Heading", background="#1c304a", foreground=MUTED,
-                        padding=(8, 6), font=("Microsoft YaHei UI", 10))
-        style.map("Treeview", background=[("selected", "#294866")],
-                  foreground=[("selected", "#ffffff")])
-        style.map("Treeview.Heading", background=[("active", "#294866")])
-        style.configure("TScrollbar", background="#29405b", troughcolor=BG, borderwidth=0)
-        style.configure("TProgressbar", background=ACCENT, troughcolor=PANEL, borderwidth=0)
+        self.appearance.configure_style(self.root)
+
+    def skin(self, window):
+        self.appearance.skin(window)
+        if hasattr(self, 'tree'):
+            colours = self.appearance.colours
+            for tag, role in [('complete', 'accent_text'), ('failed', 'error'),
+                              ('active', 'active'), ('warning', 'warning')]:
+                self.tree.tag_configure(tag, foreground=colours[role])
 
     def label(self, parent, text="", **options):
         return tk.Label(parent, text=text, bg=options.pop("bg", BG),
@@ -112,119 +119,11 @@ class App:
                            disabledforeground="#627890")
         if busy:
             self.busy_buttons.append(button)
+        button._appearance_primary=primary
         return button
 
     def build(self):
-        header = tk.Frame(self.root, bg=BG, padx=26, pady=9)
-        header.pack(fill="x")
-        self.label(header, "潜渊症  /  模组更新助手", font=("Microsoft YaHei UI", 20, "bold")).pack(anchor="w")
-        self.label(header, textvariable=self.status, fg=ACCENT).pack(anchor="w", pady=(5, 0))
-
-        toolbar = tk.Frame(self.root, bg=BG, padx=26)
-        toolbar.pack(fill="x")
-        for text, command, primary in [
-            ("开始并行更新", lambda: self.start_update(True), True),
-            ("仅同步本地缓存", lambda: self.start_update(False), False),
-            ("重新检测", self.scan, False),
-            ("启用/禁用选中模组", self.toggle_selected, False),
-            ("加载顺序", self.show_order, False),
-            ("启动游戏", self.launch, False),
-        ]:
-            self.button(toolbar, text, command, primary).pack(side="left", padx=(0, 10))
-        self.stop_button = self.button(toolbar, "停止助手任务", self.stop, busy=False)
-        self.stop_button.pack(side="right")
-        self.stop_button.configure(state="disabled")
-
-        settings = tk.Frame(self.root, bg=BG, padx=26, pady=6)
-        settings.pack(fill="x")
-        for title, variable, low, high in [("同时更新", self.download_slots, 1, 12),
-                                           ("同时安装", self.install_slots, 1, 6),
-                                           ("无进度超时（秒）", self.timeout, 30, 900)]:
-            self.label(settings, title, fg=MUTED).pack(side="left", padx=(0, 7))
-            spin = tk.Spinbox(settings, from_=low, to=high, textvariable=variable, width=5,
-                             bg=PANEL, fg=TEXT, buttonbackground="#29405b", relief="flat",
-                             insertbackground=TEXT, font=("Microsoft YaHei UI", 10))
-            spin.pack(side="left", padx=(0, 20))
-            self.busy_buttons.append(spin)
-        self.button(settings, "选择游戏目录", self.choose_game).pack(side="right")
-        scripting = tk.Frame(self.root, bg=BG, padx=26, pady=4)
-        scripting.pack(fill="x")
-        self.label(scripting, textvariable=self.luacs_text, fg=MUTED).pack(side="left")
-        self.button(scripting, "恢复 LuaCs 安装前", self.restore_luacs).pack(side="right")
-        self.button(scripting, "一键安装 LuaCs + C#", self.install_luacs).pack(side="right", padx=(0, 10))
-        features = tk.Frame(self.root, bg=BG, padx=26, pady=4)
-        features.pack(fill='x')
-        for title,command in [('配置 / 联机 / 快照',self.show_management),('完整重新分析',lambda:self.scan(force=True)),
-                              ('日志诊断',self.diagnose_logs),('选择日志',lambda:self.diagnose_logs(choose=True)),
-                              ('LuaCs 验证指引',self.verify_luacs)]:
-            self.button(features,title,command).pack(side='left',padx=(0,8))
-        for title,variable in [('更新前快照',self.auto_snapshot),('游玩时轻量检测',self.light_detection)]:
-            checkbox=tk.Checkbutton(features,text=title,variable=variable,bg=BG,fg=MUTED,selectcolor=PANEL,
-                                    activebackground=BG,activeforeground=TEXT,font=('Microsoft YaHei UI',9))
-            checkbox.pack(side='left',padx=(5,0)); self.busy_buttons.append(checkbox)
-
-        self.label(self.root, "Steam 负责实际网络调度；停止助手不会强制取消 Steam 已提交的下载。",
-                   fg=MUTED, font=("Microsoft YaHei UI", 9)).pack(side="bottom", anchor="w", padx=26, pady=(4, 6))
-
-        container = tk.Frame(self.root, bg=BG, padx=26)
-        container.pack(fill="both", expand=True)
-        controls = tk.Frame(container, bg=BG)
-        controls.pack(fill="x", pady=(0, 5))
-        for text, command in [("全选", self.select_all), ("只选已启用", self.select_enabled),
-                              ("清空选择", self.select_none)]:
-            self.button(controls, text, command).pack(side="left", padx=(0, 7))
-        self.label(controls, "搜索", fg=MUTED).pack(side="left", padx=(14, 7))
-        search = tk.Entry(controls, textvariable=self.search, bg=PANEL, fg=TEXT, relief="flat",
-                          insertbackground=TEXT, font=("Microsoft YaHei UI", 10), width=27)
-        search.pack(side="left", ipady=7)
-        self.search.trace_add("write", lambda *_: self.render())
-        self.label(controls, textvariable=self.summary, fg=MUTED).pack(side="right")
-
-        table = tk.Frame(container, bg=PANEL)
-        columns = ("check", "enable", "name", "kind", "importance", "compat",
-                   "version", "installed", "size", "stage", "progress")
-        self.tree = ttk.Treeview(table, columns=columns, show="headings",
-                                 selectmode="extended", height=3)
-        titles = ("更新", "启用", "模组", "类型", "重要程度", "兼容性", "缓存版本", "已安装版本", "大小", "状态", "进度")
-        widths = (48, 64, 280, 175, 86, 120, 90, 96, 72, 160, 66)
-        for name, title, width in zip(columns, titles, widths):
-            self.tree.heading(name, text=title)
-            self.tree.column(name, width=width, minwidth=width if name != "name" else 200,
-                             stretch=name in ("name", "stage"),
-                             anchor="w" if name in ("name", "kind", "stage") else "center")
-        horizontal = ttk.Scrollbar(table, orient="horizontal", command=self.tree.xview)
-        horizontal.pack(side="bottom", fill="x")
-        self.tree.pack(side="left", fill="both", expand=True)
-        scrollbar = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
-        scrollbar.pack(side="right", fill="y")
-        self.tree.configure(yscrollcommand=scrollbar.set, xscrollcommand=horizontal.set)
-        self.tree.tag_configure("complete", foreground=ACCENT)
-        self.tree.tag_configure("failed", foreground="#ff9f9f")
-        self.tree.tag_configure("active", foreground="#8eceff")
-        self.tree.tag_configure("warning", foreground="#f1c67b")
-        self.tree.bind("<Button-1>", self.click_checkbox)
-        self.tree.bind("<space>", self.toggle_highlight)
-        self.tree.bind("<<TreeviewSelect>>", self.show_detail)
-
-        details = tk.Frame(container, bg=BG, pady=5)
-        self.detail = tk.StringVar(value="更新勾选与启用开关分开；选中一行查看类型依据和兼容原因。")
-        self.detail_label = self.label(details, textvariable=self.detail, fg=MUTED,
-                                       anchor="nw", justify="left", wraplength=1080, height=2)
-        self.detail_label.pack(fill="x")
-        actions = tk.Frame(container, bg=BG)
-        for text, command in [("重试失败项", self.retry_failed), ("恢复选中模组上一版", self.restore),
-                              ("查看完整分析", self.show_full_analysis),
-                              ("导出兼容分析", self.export_analysis),
-                              ("导出联机清单", self.export_profile), ("对比联机清单", self.compare_profile),
-                              ("导出更新报告", self.export_report)]:
-            self.button(actions, text, command).pack(side="left", padx=(0, 8))
-
-        self.logs = tk.Text(container, height=2, bg="#0e1b2d", fg=MUTED, relief="flat", bd=0,
-                            padx=12, pady=5, font=("Microsoft YaHei UI", 9), state="disabled", wrap="word")
-        self.logs.pack(side="bottom", fill="x")
-        actions.pack(side="bottom", fill="x", pady=(0, 5))
-        details.pack(side="bottom", fill="x")
-        table.pack(side="top", fill="both", expand=True)
+        self.interface = MainInterface(self)
 
     def log(self, message):
         self.logger.info(message)
@@ -357,6 +256,7 @@ class App:
                         font=('Microsoft YaHei UI',10),yscrollcommand=scrollbar.set)
         content.pack(fill='both',expand=True); scrollbar.configure(command=content.yview)
         content.insert('1.0',text); content.configure(state='disabled')
+        self.skin(dialog)
 
     def diagnose_logs(self,choose=False):
         if not self.env: return
@@ -392,7 +292,14 @@ class App:
         for item, data in self.mods.items():
             mod = data["mod"]
             assessment = self.assessments.get(item)
-            if search and search not in (mod.name + " " + item).casefold():
+            filter_value = self.filter.get()
+            filtered = (filter_value == '已启用' and not mod.enabled
+                        or filter_value == '未启用' and mod.enabled
+                        or filter_value == '需要处理' and not (
+                            any(word in data['stage'] for word in ('待更新', '待同步', '失败', '需要检查', '超时',
+                                                                 '未安装', '等待 Steam', '等待下载', '已停止'))
+                            or assessment and assessment.compatibility.startswith('低')))
+            if filtered or search and search not in (mod.name + " " + item).casefold():
                 if item in existing:
                     self.tree.delete(item)
                 continue
@@ -516,6 +423,7 @@ class App:
         scrollbar.configure(command=content.yview)
         content.insert("1.0", "\n".join(lines))
         content.configure(state="disabled")
+        self.skin(dialog)
 
     def export_analysis(self):
         if not self.assessments:
@@ -865,6 +773,10 @@ class App:
 
     def close(self):
         self.settings.update(auto_snapshot=self.auto_snapshot.get(),light_detection=self.light_detection.get())
+        self.settings['appearance']=self.appearance.prefs
+        if self.root.winfo_viewable():
+            self.settings['window_size']=[self.root.winfo_width(),self.root.winfo_height()]
+            self.settings['column_widths']={key:self.tree.column(key,'width') for key in self.tree['columns']}
         atomic_json(self.settings_file,self.settings)
         if self.worker and self.worker.is_alive():
             self.stop()
@@ -890,7 +802,9 @@ def self_check(report_path):
 
     def finish():
         if app.env is not None and not (app.worker and app.worker.is_alive()):
+            appearance_checks = []
             try:
+                assert len(app.interface.notebook.tabs()) == 3
                 assert len(app.tree.get_children()) == len(app.mods)
                 assert len(app.features) == len(app.mods)
                 assert len(app.assessments) == len(app.mods)
@@ -910,10 +824,20 @@ def self_check(report_path):
                 assert all(item in app.mods for item in order)
                 dialog = OrderDialog(app)
                 assert dialog.ids == order
-                dialog.window.destroy()
                 manager=ManagementDialog(app)
                 assert manager.profile_list.winfo_exists() and manager.snapshot_list.winfo_exists()
-                manager.window.destroy()
+                original = app.appearance.prefs
+                try:
+                    for theme in ('ocean','graphite','daylight'):
+                        app.interface.apply({**original,'theme':theme},persist=False)
+                        assert app.root.cget('background') == app.appearance.colours['bg']
+                        assert dialog.list.cget('background') == app.appearance.colours['panel']
+                        assert manager.profile_preview.cget('foreground') == app.appearance.colours['muted']
+                        assert app.tree['displaycolumns'][:3] == ('check','enable','name')
+                        appearance_checks.append(theme)
+                finally:
+                    app.interface.apply(original,persist=False)
+                    dialog.window.destroy(); manager.window.destroy()
                 assert all(value.evidence for value in app.assessments.values())
             except Exception as error:
                 errors.append(repr(error))
@@ -922,6 +846,7 @@ def self_check(report_path):
                         "analyzed": len(app.assessments),
                         'seconds':round(time.monotonic()-started,3),
                         'analysis_cache':app.analysis_stats,
+                        'appearance_checks':appearance_checks,
                         "load_order": read_order(app.env, strict=False),
                         "luacs": asdict(luacs_status(app.env)),
                         "enabled": sum(data["mod"].enabled for data in app.mods.values()),

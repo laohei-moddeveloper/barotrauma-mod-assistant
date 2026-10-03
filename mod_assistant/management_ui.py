@@ -32,6 +32,7 @@ class ManagementDialog:
         self.profile_list.bind('<<ListboxSelect>>',lambda event:self.describe_profile())
         self.snapshot_list.bind('<<ListboxSelect>>',lambda event:self.describe_snapshot())
         self.refresh()
+        app.skin(self.window)
 
     def listbox(self,parent):
         panel=tk.Frame(parent,bg='#142237'); panel.pack(fill='both',expand=True,pady=8)
