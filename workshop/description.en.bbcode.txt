@@ -7,7 +7,7 @@ Manage mod updates, load order, friends’ setups, and script support together i
 [b]This is a standalone tool for 64-bit Windows. The Workshop delivers its files; you run the program manually. You do not need to enable this Workshop package in the game or make it a required server mod.[/b]
 The assistant itself does not require Python, LuaCs, or C#. Its installer feature is for game mods that need LuaCs and C# scripting.
 
-[b]English and Chinese interfaces:[/b] choose 中文 / English at the top. Changes are immediate and saved, including open dialogs and future messages. Selections, enabled mods, order previews, and running tasks are retained. Mod names, paths, and original log excerpts keep their language.
+[b]English and Chinese interfaces:[/b] choose English in the language selector at the top. Changes are immediate and saved, including open dialogs and future messages. Selections, enabled mods, order previews, and running tasks are retained. Mod names, paths, and original log excerpts keep their language.
 
 [h1]Getting started[/h1]
 [olist]

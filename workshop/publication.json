@@ -16,5 +16,20 @@
     "zh",
     "en"
   ],
-  "executable_sha256": "cfa1169ab8523bcc6cf2ab55ed1f99460b89b2e49b663c19be29b85585f72b1c"
+  "executable_sha256": "cfa1169ab8523bcc6cf2ab55ed1f99460b89b2e49b663c19be29b85585f72b1c",
+  "cover": {
+    "file": "cover-en.gif",
+    "language": "english",
+    "shared_between_languages": true,
+    "format": "gif",
+    "width": 800,
+    "height": 800,
+    "frames": 2,
+    "duration_ms": 2200,
+    "loop": "infinite",
+    "bytes": 843577,
+    "sha256": "e93a28192553405646b9fc55b8eb835d96e4175a7a8736f2838656a6c7e1a204",
+    "steam_preview_url": "https://images.steamusercontent.com/ugc/11875662082200959401/ED5B14009753095A4C1AA41130444A5EDD41482B/",
+    "animated_upload_verified": true
+  }
 }
