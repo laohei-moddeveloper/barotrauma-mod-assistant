@@ -1,10 +1,13 @@
+[b]Source code & downloads:[/b] [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant]GitHub project[/url] · [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/latest]Latest release & checksums[/url]
+Public source, version history, and downloads. The Workshop also delivers the program directly.
+
 [h1]Less waiting. More diving.[/h1]
-Tired of updating a long mod list before every session, rearranging your load order, or finding out your friends have a different setup? Barotrauma Mod Assistant brings those tasks together in one desktop window.
+Manage mod updates, load order, friends’ setups, and script support together in one desktop window. Spend less time preparing your next dive.
 
 [b]This is a standalone tool for 64-bit Windows. The Workshop delivers its files; you run the program manually. You do not need to enable this Workshop package in the game or make it a required server mod.[/b]
 The assistant itself does not require Python, LuaCs, or C#. Its installer feature is for game mods that need LuaCs and C# scripting.
 
-[b]Language note: the current v0.5.0 program interface is in Chinese. This page provides English instructions and translations of the main buttons. It does not add an English interface to the app.[/b]
+[b]English and Chinese interfaces:[/b] choose 中文 / English at the top. Changes are immediate and saved, including open dialogs and future messages. Selections, enabled mods, order previews, and running tasks are retained. Mod names, paths, and original log excerpts keep their language.
 
 [h1]Getting started[/h1]
 [olist]
@@ -13,24 +16,24 @@ The assistant itself does not require Python, LuaCs, or C#. Its installer featur
 [code]%LOCALAPPDATA%\Daedalic Entertainment GmbH\Barotrauma\WorkshopMods\Installed\__WORKSHOP_ID__[/code]
 [*]Copy [b]BarotraumaModAssistant.exe[/b] to a folder of your choice, then double-click the copy. No separate runtime installation is needed.
 [/olist]
-Alternatively, double-click [b]安装到桌面.cmd[/b] ("Install to desktop"). It copies the assistant to your user program folder and creates a desktop shortcut named [b]潜渊症模组更新助手（工坊版）[/b]. It does not change game settings. The copied program is stored here:
+Alternatively, double-click [b]Install-to-desktop.cmd[/b]. It copies the assistant to your user program folder and creates a desktop shortcut named [b]Barotrauma Mod Assistant (Workshop)[/b]. It does not change game settings. The copied program is stored here:
 [code]%LOCALAPPDATA%\BarotraumaModAssistant\WorkshopProgram[/code]
 
 [b]Can't find the Workshop folder?[/b] In Steam, right-click Barotrauma > Manage > Browse local files. Go up two folders to steamapps, then open:
 [code]workshop\content\602960\__WORKSHOP_ID__[/code]
 Use the Steam library where this item was downloaded. You can also copy the executable from this download cache.
 
-[b]After a Workshop update:[/b] close the old assistant and replace your copied executable, or run 安装到桌面.cmd again. Steam updates the Workshop files, but your separate desktop copy must be updated too. Unsubscribing does not remove that copy or your saved assistant settings.
+[b]After a Workshop update:[/b] close the old assistant and replace your copied executable, or run Install-to-desktop.cmd again. Steam updates the Workshop files, but your separate desktop copy must be updated too. Unsubscribing does not remove that copy or your saved assistant settings.
 
 [h1]Your first mod update[/h1]
 [olist]
 [*]Keep Steam open and signed in. Close Barotrauma and any dedicated server before updating files, changing enabled mods, switching profiles, saving the load order, or installing LuaCs.
-[*]Wait for the assistant to find your mods. [b]更新[/b] (Update) selects a mod for this update; [b]启用[/b] (Enabled) controls whether the game loads it next time. These are separate choices.
-[*]Click [b]开始并行更新[/b] (Start parallel updates). The defaults allow 4 concurrent Workshop requests and 3 concurrent installations. Adjust them in [b]设置与外观[/b] (Settings & appearance).
-[*]Open [b]加载顺序[/b] (Load order). Use [b]自动排序[/b] (Auto-sort) for a suggested order, or drag entries / move them up or down. Review the preview, then click [b]保存加载顺序[/b] (Save load order).
-[*]When finished, click [b]启动游戏[/b] (Launch game).
+[*]Wait for the assistant to find your mods. [b]Update[/b] selects a mod for this update; [b]Enabled[/b] controls whether the game loads it next time. These are separate choices.
+[*]Click [b]Start parallel updates[/b]. The defaults allow 4 concurrent Workshop requests and 3 concurrent installations. Adjust them in [b]Settings & appearance[/b].
+[*]Open [b]Load order[/b]. Use [b]Auto-sort[/b] for a suggested order, or drag entries / move them up or down. Review the preview, then click [b]Save load order[/b].
+[*]When finished, click [b]Launch game[/b].
 [/olist]
-Other useful labels: [b]模组管理[/b] = Mod management; [b]工具与脚本[/b] = Tools & scripts, including LuaCs, logs, and reports; [b]外观设置[/b] = Appearance settings.
+Use Mods for daily management; Tools & scripts for LuaCs, logs, and exports; Settings & appearance for update settings and personalization.
 
 [h1]What it can do[/h1]
 [list]
@@ -46,7 +49,7 @@ Other useful labels: [b]模组管理[/b] = Mod management; [b]工具与脚本[/b
 
 [h1]Before you dive: common questions[/h1]
 [b]Why is there no new button inside the game?[/b]
-This is a desktop application. Subscribing or enabling the package does not automatically launch it. Follow the installation steps above.
+This is a desktop app. Subscribing does not launch it; follow the steps above.
 
 [b]Will every mod download faster?[/b]
 The assistant can submit requests and install files in parallel, but Steam controls network downloads. It cannot guarantee that all downloads run simultaneously or bypass Steam's queue, server limits, or your bandwidth. Requests already accepted by Steam may continue after you stop the assistant.
@@ -64,8 +67,8 @@ Steam supplies the current Workshop version, not historical versions from a shar
 The assistant connects to the game's Steam Workshop interface, so Steam may show the game as running during that connection. This does not mean the assistant opened a game window.
 
 [h1]Version and feedback[/h1]
-Included program: [b]v0.5.0[/b]. Its release checks passed 89 unit/isolated tests and a standalone self-check; theme and window layouts were checked. This does not certify every mod combination. Real multiplayer testing with a friend's setup has not been completed.
+Included program: [b]v0.6.0[/b]. Release checks cover 96 unit/isolated tests, both languages, themes, open dialogs, and small-window layouts. This does not certify every mod combination. Real multiplayer testing with a friend's setup has not been completed.
 
-The package includes the Chinese 使用说明.md guide and SHA-256 checksums. It contains no base-game files, third-party Workshop mods, account credentials, or the creator's personal mod setup. The cover is an original AI-assisted illustration; this is a community tool, not an official game release.
+Includes README_EN.md, a Chinese guide, and SHA-256 checksums. No base-game files, third-party mods, credentials, or personal setups. A community tool with an original AI-assisted cover.
 
-When reporting a problem, include the assistant version, steps to reproduce it, and the exact message shown. Review exported reports and remove personal information you do not want to share before posting them.
+Report the version, reproduction steps, and exact error. Remove personal information from reports before sharing.

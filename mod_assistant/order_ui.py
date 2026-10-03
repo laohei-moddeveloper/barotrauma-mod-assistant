@@ -34,7 +34,7 @@ class OrderDialog:
         self.list.bind("<ButtonPress-1>", self.drag_start)
         self.list.bind("<B1-Motion>", self.drag_move)
         self.list.bind("<ButtonRelease-1>", lambda event: setattr(self, "drag_index", None))
-        self.note = tk.StringVar(value="自动排序考虑资源依赖，保留重复定义的现有覆盖顺序，再建议框架、汉化、补丁、内容分组。请优先遵循作者说明。")
+        self.note = app.locale.variable(app.root, value="自动排序考虑资源依赖，保留重复定义的现有覆盖顺序，再建议框架、汉化、补丁、内容分组。请优先遵循作者说明。")
         app.label(self.window, textvariable=self.note, fg="#8fa6bf", wraplength=800,
                   justify="left", height=3, anchor="nw").pack(fill="x", padx=20)
         buttons = tk.Frame(self.window, bg="#0b1422")
@@ -44,6 +44,7 @@ class OrderDialog:
                                ("前后规则", self.edit_rules), ("保存加载顺序", self.save)]:
             app.button(buttons, title, command, primary=title.startswith("保存"), busy=False).pack(
                 side="left", padx=(0, 10))
+        self.window._language_refresh = lambda: self.render(self.list.curselection()[0] if self.list.curselection() else None)
         self.render()
         app.skin(self.window)
 
@@ -52,7 +53,7 @@ class OrderDialog:
         for number, item in enumerate(self.ids, 1):
             data = self.app.mods.get(item)
             name = data["mod"].name if data else item
-            locked = ' [锁定]' if item in self.rules['locks'] else ''
+            locked = self.app.tr(' [锁定]') if item in self.rules['locks'] else ''
             self.list.insert("end", f"  {number:02d}    {name}{locked}")
         if selected is not None and self.ids:
             self.list.selection_set(selected)
@@ -116,7 +117,7 @@ class OrderDialog:
         def refresh():
             listing.delete(0,'end')
             for before,after in pending:
-                label=lambda item: self.app.mods[item]['mod'].name if item in self.app.mods else item+'（未启用）'
+                label=lambda item: self.app.mods[item]['mod'].name if item in self.app.mods else item+self.app.tr('（未启用）')
                 listing.insert('end',label(before)+' → '+label(after))
         def add():
             a,b=first.current(),second.current()
@@ -132,7 +133,7 @@ class OrderDialog:
                 save_rules(self.app.env,rules); self.rules=rules
                 self.note.set('前后规则已保存。点击自动排序应用规则；保存顺序后游戏才会使用新顺序。')
                 window.destroy(); self.window.grab_set()
-            except Exception as error: messagebox.showerror('规则无法应用',str(error),parent=window)
+            except Exception as error: self.app.dialogs.showerror('规则无法应用',str(error),parent=window)
         buttons=tk.Frame(window,bg='#0b1422'); buttons.pack(fill='x',padx=15,pady=(0,15))
         for title,command in [('添加规则',add),('删除选中规则',remove),('保存规则',commit)]:
             self.app.button(buttons,title,command,busy=False).pack(side='left',padx=(0,10))
@@ -153,7 +154,7 @@ class OrderDialog:
                 self.app.log("排序建议：" + reason)
             self.render()
         except Exception as error:
-            messagebox.showerror("无法自动排序", str(error), parent=self.window)
+            self.app.dialogs.showerror("无法自动排序", str(error), parent=self.window)
 
     def save(self):
         ids = list(self.ids)

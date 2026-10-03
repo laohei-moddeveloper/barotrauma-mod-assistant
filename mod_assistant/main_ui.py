@@ -5,6 +5,7 @@ from tkinter import colorchooser, messagebox, ttk
 from . import VERSION
 from .appearance import COLUMNS, DEFAULTS, THEMES, TITLES, normalize
 from .core import atomic_json
+from .i18n import LANGUAGES
 
 BG, PANEL, TEXT, MUTED = '#0b1422', '#142237', '#e8f0fa', '#8fa6bf'
 
@@ -57,19 +58,26 @@ class MainInterface:
 
     def build(self):
         app=self.app
-        header=self.frame(app.root,padx=22,pady=10); header.pack(fill='x')
+        header=self.frame(app.root,padx=22,pady=6); header.pack(fill='x')
         identity=self.frame(header); identity.pack(side='left')
         app.label(identity,'潜渊症 · 模组助手',font=('Microsoft YaHei UI',20,'bold')).pack(anchor='w')
         app.button(header,'外观设置',lambda:self.notebook.select(self.settings_page),busy=False).pack(side='right')
+        self.language=tk.StringVar(value=LANGUAGES[app.locale.language])
+        self.language_picker=ttk.Combobox(header,textvariable=self.language,
+                                         values=list(LANGUAGES.values()),state='readonly',width=9)
+        self.language_picker.pack(side='right',padx=(10,12))
+        self.language_picker.bind('<<ComboboxSelected>>',lambda event:
+                                  app.set_language(next(key for key,value in LANGUAGES.items() if value==self.language.get())))
+        app.label(header,'语言 / Language',fg=MUTED,font=('Microsoft YaHei UI',9)).pack(side='right')
         app.label(header,'v'+VERSION,fg=MUTED).pack(side='right',padx=16)
-        toolbar=self.frame(app.root,padx=22,pady=4); toolbar.pack(fill='x')
+        toolbar=self.frame(app.root,padx=22,pady=2); toolbar.pack(fill='x')
         app.update_button=app.button(toolbar,'开始并行更新',lambda:app.start_update(True),primary=True)
         app.update_button.pack(side='left',padx=(0,10))
         app.refresh_button=app.button(toolbar,'重新检测',app.scan); app.refresh_button.pack(side='left',padx=(0,10))
         app.button(toolbar,'启动游戏',app.launch).pack(side='left')
         app.stop_button=app.button(toolbar,'停止任务',app.stop,busy=False)
         app.stop_button.pack(side='right'); app.stop_button.configure(state='disabled')
-        status=self.frame(app.root,padx=22,pady=7); status.pack(side='bottom',fill='x')
+        status=self.frame(app.root,padx=22,pady=4); status.pack(side='bottom',fill='x')
         self.status_label=app.label(status,textvariable=app.status,fg=MUTED,anchor='w',justify='left',wraplength=1200)
         self.status_label.pack(side='left',fill='both',expand=True)
         self.log_panel=self.frame(app.root,padx=22,pady=3)
@@ -107,7 +115,7 @@ class MainInterface:
         controls=self.frame(container); controls.pack(fill='x',pady=(0,8))
         for title,command in [('全选',app.select_all),('只选已启用',app.select_enabled),('清空',app.select_none)]:
             app.button(controls,title,command).pack(side='left',padx=(0,6))
-        app.filter=tk.StringVar(value='全部模组')
+        app.filter=app.locale.variable(app.root,value='全部模组')
         filters=ttk.Combobox(controls,textvariable=app.filter,values=['全部模组','已启用','未启用','需要处理'],
                              state='readonly',width=10); filters.pack(side='left',padx=(8,8))
         app.search_entry=tk.Entry(controls,textvariable=app.search,bg=PANEL,fg=TEXT,relief='flat',
@@ -128,7 +136,7 @@ class MainInterface:
         app.label(summary,textvariable=app.summary,fg=MUTED).pack(side='left')
         app.label(summary,'搜索名称或编号 · Ctrl+F',fg=MUTED,font=('Microsoft YaHei UI',9)).pack(side='right')
         details=self.frame(container,pady=4); details.pack(side='bottom',fill='x')
-        app.detail=tk.StringVar(value='“更新”勾选与“启用”开关分别控制。选中一行可查看类型与兼容原因。')
+        app.detail=app.locale.variable(app.root,value='“更新”勾选与“启用”开关分别控制。选中一行可查看类型与兼容原因。')
         app.detail_label=app.label(details,textvariable=app.detail,fg=MUTED,anchor='nw',justify='left',wraplength=1100,height=2)
         app.detail_label.pack(fill='x')
         table=self.frame(container,panel=True); table.pack(fill='both',expand=True)
@@ -175,7 +183,7 @@ class MainInterface:
         self.heading(body,'按你的习惯使用助手','外观立即生效并自动保存。更新设置可以单独保存，原有模组配置不受影响。')
         grid=self.frame(body); grid.pack(fill='x'); grid.columnconfigure((0,1),weight=1,uniform='settings')
         appearance=self.card(grid,'外观与阅读','选择主题、强调色和列表样式。可以随时恢复默认外观。',0)
-        self.theme=tk.StringVar(); self.font=tk.StringVar(); self.density=tk.StringVar()
+        self.theme=app.locale.variable(app.root); self.font=tk.StringVar(); self.density=app.locale.variable(app.root)
         self.logs_visible=tk.BooleanVar()
         for title,variable,values in [('主题',self.theme,list(THEMES.values())),
                                        ('字号',self.font,['10','11','12']),('列表疏密',self.density,['舒适','紧凑'])]:
@@ -236,6 +244,7 @@ class MainInterface:
                 app.logs.pack(fill='x',pady=(4,0)); self.log_button.configure(text='收起记录 ▴')
             else:
                 app.logs.pack_forget(); self.log_panel.pack_forget(); self.log_button.configure(text='任务记录 ▾')
+            app.locale.localize(app.root)
             app.settings['appearance']=prefs
             if persist: atomic_json(app.settings_file,app.settings)
         finally: self.updating=False
@@ -248,7 +257,7 @@ class MainInterface:
         self.apply({**self.app.appearance.prefs,'show_logs':not self.app.appearance.prefs['show_logs']})
 
     def choose_accent(self):
-        result=colorchooser.askcolor(initialcolor=self.app.appearance.prefs['accent'],title='选择强调色',parent=self.app.root)[1]
+        result=colorchooser.askcolor(initialcolor=self.app.appearance.prefs['accent'],title=self.app.tr('选择强调色'),parent=self.app.root)[1]
         if result: self.apply({**self.app.appearance.prefs,'accent':result})
 
     def save_operations(self):
@@ -257,7 +266,7 @@ class MainInterface:
             values=dict(download_slots=max(1,min(12,app.download_slots.get())),
                         install_slots=max(1,min(6,app.install_slots.get())),timeout=max(30,min(900,app.timeout.get())))
         except tk.TclError:
-            messagebox.showerror('设置无效','并行数量和超时必须填写数字。',parent=app.root); return
+            self.app.dialogs.showerror('设置无效','并行数量和超时必须填写数字。',parent=app.root); return
         app.download_slots.set(values['download_slots']); app.install_slots.set(values['install_slots']); app.timeout.set(values['timeout'])
         app.settings.update(values,auto_snapshot=app.auto_snapshot.get(),light_detection=app.light_detection.get())
         atomic_json(app.settings_file,app.settings); app.log('更新设置已保存。')

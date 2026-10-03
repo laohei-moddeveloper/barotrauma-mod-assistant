@@ -1,10 +1,12 @@
 # 潜渊症模组更新助手
 
-面向 Windows 64 位 Steam 版《潜渊症》（Barotrauma）的独立模组管理工具。当前版本 **0.5.0**。
+面向 Windows 64 位 Steam 版《潜渊症》（Barotrauma）的独立模组管理工具。当前版本 **0.6.0**。
+
+[English guide](README_EN.md) · 程序右上角可在「中文 / English」之间实时切换，自动保存语言选择。
 
 ## 下载和使用
 
-在本仓库的 [Releases](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases) 下载对应版本的 Windows 压缩包，解压后双击「潜渊症模组更新助手.exe」。无需安装 Python。保持 Steam 已登录，更新、切换启用状态、保存顺序及安装 LuaCs 前请关闭游戏和专用服务器。详细操作见 [使用说明](使用说明.md)。
+在本仓库的 [Releases](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases) 下载对应版本的 Windows 压缩包，解压后双击 `BarotraumaModAssistant.exe`（历史版本为「潜渊症模组更新助手.exe」）。无需安装 Python。保持 Steam 已登录，更新、切换启用状态、保存顺序及安装 LuaCs 前请关闭游戏和专用服务器。详细操作见 [使用说明](使用说明.md)。
 
 也可通过 [Steam 创意工坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3812360206) 订阅分发包，按照页面步骤运行「安装到桌面.cmd」。这是独立工具，无需在游戏中启用分发包；桌面版在工坊下载新版后需手动重新复制。工坊介绍和封面见 [workshop](workshop)。
 
@@ -34,6 +36,7 @@ Steam 负责实际下载调度，助手不能保证突破客户端队列或带�
 | 0.3.0 | 自动/拖动排序、LuaCs 与永久 C# 一键设置、游戏运行时检测提示 | 47 项测试 |
 | 0.4.0 | 多套配置、分析缓存、兼容证据、排序规则、日志诊断、整套快照、联机配齐、LuaCs 验证指引 | 81 项测试 |
 | 0.5.0 | 实时外观定制、三页导航、筛选与快捷键、显示列和窗口记忆 | 89 项测试 |
+| 0.6.0 | 中文/English 实时切换、双语提示与报告、英文说明与安装入口 | 96 项测试 |
 
 版本变化见 [CHANGELOG](CHANGELOG.md)，发布及重建说明见 [releases](releases)，验证范围见 [docs/validation.md](docs/validation.md)。0.1.0 与 0.2.0 的安装包从对应历史源码重新构建，发布记录会明确标注。
 

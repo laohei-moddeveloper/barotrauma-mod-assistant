@@ -7,9 +7,11 @@ from .core import AssistantError, atomic_json
 from .friends import apply_with_downloads
 from .profiles import capture_profile, normalize_profile, resolve_profile, save_profile
 from .snapshots import SnapshotStore
+from .i18n import Dialogs
 
 class ManagementDialog:
     def __init__(self, app):
+        self.prompts=Dialogs(app.locale, simpledialog)
         self.app=app; self.env=app.env; self.profiles={}; self.snapshots={}
         self.window=tk.Toplevel(app.root); self.window.title('配置、联机与快照')
         self.window.geometry('940x700'); self.window.configure(bg='#0b1422'); self.window.transient(app.root)
@@ -31,6 +33,7 @@ class ManagementDialog:
                   fg='#8fa6bf',wraplength=880).pack(anchor='w',pady=8)
         self.profile_list.bind('<<ListboxSelect>>',lambda event:self.describe_profile())
         self.snapshot_list.bind('<<ListboxSelect>>',lambda event:self.describe_snapshot())
+        self.window._language_refresh = self.relocalize
         self.refresh()
         app.skin(self.window)
 
@@ -46,13 +49,22 @@ class ManagementDialog:
         text.pack(fill='x',pady=6); text.configure(state='disabled'); return text
 
     def set_preview(self,text,value):
-        text.configure(state='normal'); text.delete('1.0','end'); text.insert('1.0',value); text.configure(state='disabled')
+        text.configure(state='normal'); text.delete('1.0','end'); self.app.locale.bind_text(text,value,[entry['mod'].name for entry in self.app.mods.values()]); text.configure(state='disabled')
 
     def buttons(self,parent,items):
         frame=tk.Frame(parent,bg='#0b1422'); frame.pack(fill='x',pady=6)
         for title,command in items: self.app.button(frame,title,command,busy=False).pack(side='left',padx=(0,7))
 
     def busy(self): return bool(self.app.worker and self.app.worker.is_alive())
+
+    def relocalize(self):
+        profile=self.profile_keys[self.profile_list.curselection()[0]] if self.profile_list.curselection() else None
+        snapshot=self.snapshot_keys[self.snapshot_list.curselection()[0]] if self.snapshot_list.curselection() else None
+        self.refresh()
+        if profile in self.profile_keys:
+            self.profile_list.selection_set(self.profile_keys.index(profile)); self.describe_profile()
+        if snapshot in self.snapshot_keys:
+            self.snapshot_list.selection_set(self.snapshot_keys.index(snapshot)); self.describe_snapshot()
 
     def refresh(self):
         if not self.window.winfo_exists(): return
@@ -62,7 +74,7 @@ class ManagementDialog:
             except (OSError,ValueError,AssistantError): continue
         self.profile_keys=list(self.profiles); self.profile_list.delete(0,'end')
         for key in self.profile_keys:
-            data=self.profiles[key][1]; self.profile_list.insert('end',f"{data.get('name','未命名')} · {len(data['order'])} 个普通模组")
+            data=self.profiles[key][1]; self.profile_list.insert('end',self.app.tr(f"{data.get('name','未命名')} · {len(data['order'])} 个普通模组"))
         self.set_preview(self.profile_preview,'选择上方配置查看清单。' if self.profile_keys else '还没有保存配置。点击“保存当前配置”记录你现在启用的组合，或导入朋友的清单。')
         values=SnapshotStore(self.env).list(); self.snapshots={v['id']:v for v in values}
         self.snapshot_keys=list(self.snapshots); self.snapshot_list.delete(0,'end')
@@ -98,7 +110,7 @@ class ManagementDialog:
 
     def save_current(self):
         if self.busy(): return
-        name=simpledialog.askstring('保存配置','给这套配置起一个名字：',parent=self.window)
+        name=self.prompts.askstring('保存配置','给这套配置起一个名字：',parent=self.window)
         if not name: return
         def work():
             save_profile(self.env,capture_profile(self.env,name))
@@ -108,25 +120,25 @@ class ManagementDialog:
 
     def import_file(self):
         if self.busy(): return
-        path=filedialog.askopenfilename(title='选择朋友或自己导出的配置',filetypes=[('模组配置','*.json')],parent=self.window)
+        path=self.app.files.askopenfilename(title='选择朋友或自己导出的配置',filetypes=[('模组配置','*.json')],parent=self.window)
         if not path: return
         try:
             if Path(path).stat().st_size>2*1024*1024: raise AssistantError('配置文件过大')
             data=normalize_profile(json.loads(Path(path).read_text(encoding='utf-8-sig')))
             result=save_profile(self.env,data); self.refresh()
             index=self.profile_keys.index(result.stem); self.profile_list.selection_set(index); self.describe_profile()
-        except Exception as error: messagebox.showerror('导入失败',str(error),parent=self.window)
+        except Exception as error: self.app.dialogs.showerror('导入失败',str(error),parent=self.window)
 
     def export_file(self):
         try: data=self.selected_profile()
-        except AssistantError as error: messagebox.showinfo('选择配置',str(error),parent=self.window); return
-        path=filedialog.asksaveasfilename(title='导出选中配置',defaultextension='.json',initialfile='潜渊症模组配置.json',parent=self.window)
+        except AssistantError as error: self.app.dialogs.showinfo('选择配置',str(error),parent=self.window); return
+        path=self.app.files.asksaveasfilename(title='导出选中配置',defaultextension='.json',initialfile='潜渊症模组配置.json',parent=self.window)
         if path: atomic_json(Path(path),data)
 
     def compare(self):
         if self.busy(): return
         try: data=self.selected_profile()
-        except AssistantError as error: messagebox.showinfo('选择配置',str(error),parent=self.window); return
+        except AssistantError as error: self.app.dialogs.showinfo('选择配置',str(error),parent=self.window); return
         def work():
             _,missing,differences=resolve_profile(self.env,data)
             current=capture_profile(self.env)
@@ -140,7 +152,7 @@ class ManagementDialog:
     def apply(self,download):
         if self.busy(): return
         try: data=self.selected_profile()
-        except AssistantError as error: messagebox.showinfo('选择配置',str(error),parent=self.window); return
+        except AssistantError as error: self.app.dialogs.showinfo('选择配置',str(error),parent=self.window); return
         allow=self.allow.get()
         def work():
             result=apply_with_downloads(self.env,data,download,allow,self.app.events.put,self.app.cancel)
@@ -149,7 +161,7 @@ class ManagementDialog:
 
     def capture_snapshot(self):
         if self.busy(): return
-        name=simpledialog.askstring('保存快照','快照名称：',initialvalue='游玩验证后的组合',parent=self.window)
+        name=self.prompts.askstring('保存快照','快照名称：',initialvalue='游玩验证后的组合',parent=self.window)
         if not name: return
         def work():
             result=SnapshotStore(self.env,lambda message:self.app.events.put({'kind':'scan_status','message':message}),cancel=self.app.cancel).capture(name,reuse=False)
@@ -160,7 +172,7 @@ class ManagementDialog:
     def restore_snapshot(self):
         if self.busy(): return
         try: data=self.selected_snapshot()
-        except AssistantError as error: messagebox.showinfo('选择快照',str(error),parent=self.window); return
+        except AssistantError as error: self.app.dialogs.showinfo('选择快照',str(error),parent=self.window); return
         def work():
             result=SnapshotStore(self.env,lambda message:self.app.events.put({'kind':'scan_status','message':message}),cancel=self.app.cancel).restore(data['id'])
             result['message']=f"已恢复 {result['restored']} 个目录及启用顺序；下次启动游戏生效"

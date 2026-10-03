@@ -1,53 +1,56 @@
 {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "platform": "Windows x64",
-  "unit_tests_passed": 89,
+  "languages": [
+    "zh",
+    "en"
+  ],
+  "unit_tests_passed": 96,
   "packaged_self_check": true,
   "historical_binary_rebuilt": false,
   "validation": {
-    "mod_count": 51,
-    "analysis_cache": {
-      "reused": 51,
-      "scanned": 0,
-      "deferred": 0
-    },
-    "packaged_self_check_seconds": 27.875,
+    "mod_count": 52,
+    "language_checks": [
+      "zh",
+      "en"
+    ],
     "live_themes_and_existing_dialogs": [
       "ocean",
       "graphite",
       "daylight"
     ],
-    "interface_preview_count": 7,
+    "packaged_self_check_seconds": 22.422,
     "small_window_large_font_checked": true,
-    "preview_real_configuration_unchanged": true,
     "gameplay_and_friend_session_verified": false
   },
   "executable": {
-    "name": "潜渊症模组更新助手.exe",
-    "bytes": 13374061,
-    "sha256": "bf8a6f164e3ffa8b92067118a67fa6a1fe514c42a50bc63bb8fb61a159d0047c"
+    "name": "BarotraumaModAssistant.exe",
+    "bytes": 13416257,
+    "sha256": "ff87239b5dcca31f187875b468867601504494e41cacdeb4d018d8162d79e79c"
   },
   "archive": {
-    "name": "BarotraumaModAssistant-v0.5.0-win64.zip",
-    "bytes": 13096645,
-    "sha256": "d5f250b665fe7feb720f6b66106cf890a5ebcdf4094c84211cda51679f93c7d8"
+    "name": "BarotraumaModAssistant-v0.6.0-win64.zip",
+    "bytes": 13141552,
+    "sha256": "bab4d5a78a54ebf6b24eb58e079a16a40c07fe8dffda6e27db44dfb6db0202b4"
   },
   "sources": {
-    "mod_assistant/__init__.py": "eea3dc6a13810e480c5e6b37347a437b37e91a5ec0f214ccb69369a92946751f",
+    "mod_assistant/__init__.py": "c4b2e6f53cb55ad98e77a7013e9b017a47dbf16f973d0be957e40ba22875d4ca",
     "mod_assistant/analysis_cache.py": "31769f63a44f74116c3249aa67b3f293bac5770d4d34d8874cb24c8d8f40c449",
-    "mod_assistant/app.py": "bac08efaa9a09b5a1bd156fd927a43ce84dcfe78ef3b711c6db150e757ccb078",
+    "mod_assistant/app.py": "a52b1b26611e321014a88d5406090314527a6d938a6e5916897110cab4ca60b0",
     "mod_assistant/appearance.py": "aeccc7ee8e7f1f8a55433d5809efb0dc7ea5e720985b383a3ce2c2b3e3a4b2d4",
     "mod_assistant/core.py": "74f3258f4d543c96438d6dcc907e172ff6c61cec39d02bba45d68dcbe7fe87d9",
     "mod_assistant/diagnostics.py": "2ab37a373bafb1299d83453bb944a03a207a1564e832d047b29355b28928b28a",
     "mod_assistant/engine.py": "c1d39df696499f0d40e04927d0b9f95b4995aeac289094c76add1dd41206ccbb",
     "mod_assistant/friends.py": "0ff82be890e21b717a5fd27dbe4a9a2cf1e2ac273ec1301fd6ed8f5ea6aea242",
+    "mod_assistant/i18n.py": "158b40380b0d988e4fa6661f7807b9a8266878ec106f75d1df4b0d2070f41a5f",
+    "mod_assistant/i18n_catalog.py": "84e1fba5a9a08fde49c300234be397789cb14cee7e5431004e6684a5b17acddd",
     "mod_assistant/luacs.py": "cf88b0c55c0fc2a074c7f642d2828f90d03b36df694369609ecd8820ca4f1ad9",
-    "mod_assistant/main_ui.py": "0910665ffcaad95803b236b3178e18282d2bb1d51146c367679714ccfbe6cec6",
-    "mod_assistant/management_ui.py": "f9247998387f60dac2db25e71728807abb4e68063aa83fc8bca81aa6d42271ef",
+    "mod_assistant/main_ui.py": "a5ef2efdc96f1cba1956225a8037360bc8a472123f733eb4a6af2184987d8156",
+    "mod_assistant/management_ui.py": "db7a19f538c78bd2142d6142853177d0c745166bb6293d3348d46d99c0a377c7",
     "mod_assistant/mod_analysis.py": "7488775c8a6749548001854931ca29c74afbb2d9185cf25651b7603716ee4b2c",
     "mod_assistant/mod_order.py": "d69cb4bcde48603fe3e55808c721d12e72fdb2ae373d18381efc07fe2aaa945a",
     "mod_assistant/mod_toggle.py": "6a7b6afdb149691a1b2c482ce19f59e4711d6ca3b1cc82a78969ba3a5d5b819f",
-    "mod_assistant/order_ui.py": "ff0052b32a46159b8557c15b5d4af095ec46945be02ecf59bce13c1368bb7585",
+    "mod_assistant/order_ui.py": "d7165387263218afdb250dc87cda9f577d19a51128612d79b5bd6ba0679a104a",
     "mod_assistant/profiles.py": "3096b2636251235e8f5b50ddb0c7de24385a08b4d2bc2086b053a04742616557",
     "mod_assistant/snapshots.py": "42c803787163427872eae6fc6a5902d32fb27cfcc97d5c01bd325183f30f4a26",
     "mod_assistant/steam.py": "9c0063e5b167cf071592d4a040c194519185bf4832ce0f1a27e3170284faeaba"

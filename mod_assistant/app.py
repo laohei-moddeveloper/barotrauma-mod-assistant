@@ -31,6 +31,7 @@ from .diagnostics import diagnose, recent_logs, lua_verification
 from .steam import BUSY, DOWNLOADING, NEEDS_UPDATE, PENDING, SteamBridge
 from .appearance import Appearance
 from .main_ui import MainInterface
+from .i18n import Localizer, Dialogs, LANGUAGES
 
 STATE = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "BarotraumaModAssistant"
 BG, PANEL, TEXT, MUTED, ACCENT = "#0b1422", "#142237", "#e8f0fa", "#8fa6bf", "#57dac4"
@@ -54,7 +55,6 @@ class App:
         self.online = False
         self.runtime_luacs = None
         self.runtime_csharp = None
-        self.luacs_text = tk.StringVar(value="LuaCs 状态待检测")
         self.selected = set()
         self.env = None
         self.stage_log = {}
@@ -67,6 +67,12 @@ class App:
         except (OSError, ValueError):
             self.settings = {}
         if not isinstance(self.settings,dict): self.settings = {}
+        self.locale = Localizer(self.settings.get('language'))
+        self.tr = self.locale.text
+        self.dialogs = Dialogs(self.locale, messagebox)
+        self.files = Dialogs(self.locale, filedialog)
+        self.log_history = []
+        self.luacs_text = self.locale.variable(self.root, value="LuaCs 状态待检测")
         self.appearance=Appearance(self.settings.get('appearance'))
         screen_width,screen_height=self.root.winfo_screenwidth(),self.root.winfo_screenheight()
         size=self.settings.get('window_size',[1360,800])
@@ -81,8 +87,8 @@ class App:
             handler = RotatingFileHandler(STATE / "assistant.log", maxBytes=2_000_000,
                                            backupCount=3, encoding="utf-8")
             self.logger.addHandler(handler)
-        self.status = tk.StringVar(value="正在准备本机检测…")
-        self.summary = tk.StringVar(value="选择模组，然后开始并行更新")
+        self.status = self.locale.variable(self.root, value="正在准备本机检测…")
+        self.summary = self.locale.variable(self.root, value="选择模组，然后开始并行更新")
         self.download_slots = tk.IntVar(value=self.settings.get("download_slots", 4))
         self.install_slots = tk.IntVar(value=self.settings.get("install_slots", 3))
         self.timeout = tk.IntVar(value=self.settings.get("timeout", 180))
@@ -101,6 +107,7 @@ class App:
 
     def skin(self, window):
         self.appearance.skin(window)
+        self.locale.localize(window)
         if hasattr(self, 'tree'):
             colours = self.appearance.colours
             for tag, role in [('complete', 'accent_text'), ('failed', 'error'),
@@ -125,10 +132,38 @@ class App:
     def build(self):
         self.interface = MainInterface(self)
 
+    def set_language(self, language, persist=True):
+        if language not in LANGUAGES:
+            return
+        # Preserve the raw values used by filter/theme callbacks while Tk updates
+        # their translated display. Running tasks and queued events stay intact.
+        self.interface.updating = True
+        try:
+            self.locale.switch(language, self.root)
+        finally:
+            self.interface.updating = False
+        self.interface.language.set(LANGUAGES[language])
+        for widget in self.root.winfo_children():
+            refresh = getattr(widget, '_language_refresh', None)
+            if refresh and widget.winfo_exists():
+                refresh()
+        self.render()
+        self.show_detail()
+        self.logs.configure(state='normal')
+        self.logs.delete('1.0','end')
+        self.logs.insert('1.0','\n'.join(self.tr(entry) for entry in self.log_history)+'\n')
+        self.logs.configure(state='disabled')
+        self.settings['language'] = language
+        if persist:
+            atomic_json(self.settings_file, self.settings)
+
     def log(self, message):
         self.logger.info(message)
         self.logs.configure(state="normal")
-        self.logs.insert("end", time.strftime("%H:%M:%S") + "  " + message + "\n")
+        entry = time.strftime("%H:%M:%S") + "  " + message
+        self.log_history.append(entry)
+        self.log_history = self.log_history[-250:]
+        self.logs.insert("end", self.tr(entry) + "\n")
         if int(self.logs.index("end-1c").split(".")[0]) > 250:
             self.logs.delete("1.0", "50.0")
         self.logs.see("end")
@@ -136,7 +171,7 @@ class App:
 
     def callback_error(self, error_type, error, trace):
         self.logger.error("界面操作失败", exc_info=(error_type, error, trace))
-        messagebox.showerror("操作未完成", str(error), parent=self.root)
+        self.dialogs.showerror("操作未完成", str(error), parent=self.root)
 
     def verified_fingerprint(self, item):
         receipt = self.env.work / "receipts" / (item + ".json")
@@ -255,13 +290,13 @@ class App:
         content=tk.Text(panel,bg=PANEL,fg=TEXT,wrap='word',relief='flat',padx=12,pady=12,
                         font=('Microsoft YaHei UI',10),yscrollcommand=scrollbar.set)
         content.pack(fill='both',expand=True); scrollbar.configure(command=content.yview)
-        content.insert('1.0',text); content.configure(state='disabled')
+        self.locale.bind_text(content, text, [data["mod"].name for data in self.mods.values()]); content.configure(state='disabled')
         self.skin(dialog)
 
     def diagnose_logs(self,choose=False):
         if not self.env: return
         logs=recent_logs(self.env)
-        path=filedialog.askopenfilename(title='选择游戏、LuaCs 或服务器日志',filetypes=[('日志','*.log *.txt'),('所有文件','*.*')],parent=self.root) if choose or not logs else logs[0]
+        path=self.files.askopenfilename(title='选择游戏、LuaCs 或服务器日志',filetypes=[('日志','*.log *.txt'),('所有文件','*.*')],parent=self.root) if choose or not logs else logs[0]
         if not path: return
         mods=[data['mod'] for data in self.mods.values()]
         summary=self.last_summary
@@ -309,9 +344,10 @@ class App:
                       mod.name, shown_type or "待分析",
                       assessment.importance if assessment else "待分析",
                       assessment.compatibility if assessment else "待分析",
-                      mod.mod_version or "—", mod.installed_version or "未安装",
+                      mod.mod_version or "—", mod.installed_version or self.tr("未安装"),
                       f"{mod.size / 1048576:.1f} MB" if mod.size else "—", data["stage"],
                       f'{data["progress"]:.0f}%' if data["progress"] else "—")
+            values = tuple(value if index in (0,2,6,7,8,10) else self.tr(value) for index,value in enumerate(values))
             stage = data["stage"]
             tag = "complete" if stage in ("已完成", "版本已同步") else (
                 "failed" if stage in ("失败", "等待超时") or stage.startswith("需要检查") else
@@ -385,7 +421,7 @@ class App:
     def show_full_analysis(self):
         highlighted = self.tree.selection()
         if len(highlighted) != 1:
-            messagebox.showinfo("选择一行", "请先选中一个模组查看分析。", parent=self.root)
+            self.dialogs.showinfo("选择一行", "请先选中一个模组查看分析。", parent=self.root)
             return
         item = highlighted[0]
         mod = self.mods[item]["mod"]
@@ -421,14 +457,14 @@ class App:
                           yscrollcommand=scrollbar.set)
         content.pack(side="left", fill="both", expand=True)
         scrollbar.configure(command=content.yview)
-        content.insert("1.0", "\n".join(lines))
+        self.locale.bind_text(content, "\n".join(lines), [data["mod"].name for data in self.mods.values()])
         content.configure(state="disabled")
         self.skin(dialog)
 
     def export_analysis(self):
         if not self.assessments:
             return
-        path = filedialog.asksaveasfilename(title="导出兼容分析", defaultextension=".json",
+        path = self.files.asksaveasfilename(title="导出兼容分析", defaultextension=".json",
                                             initialfile="潜渊症模组兼容分析.json", parent=self.root)
         if not path:
             return
@@ -446,15 +482,15 @@ class App:
                          "xml_definitions": len(feature.definitions), "code_files": feature.code_files,
                          "method_patches": len(feature.patches), "hook_registrations": len(feature.hook_names),
                          "unreadable_libraries": feature.opaque_code, "partial": feature.partial})
-        atomic_json(Path(path), {"schema": "barotrauma-mod-analysis-v1",
+        atomic_json(Path(path), self.locale.report({"schema": "barotrauma-mod-analysis-v1",
                                  "note": "静态风险筛查；需要结合模组作者说明、加载顺序和游戏内测试。",
-                                 "runtime_luacs_detected": self.runtime_luacs, "mods": rows})
+                                 "runtime_luacs_detected": self.runtime_luacs, "mods": rows}))
         self.log("已导出全部模组的兼容分析。")
 
     def toggle_selected(self):
         highlighted = self.tree.selection()
         if len(highlighted) != 1:
-            messagebox.showinfo("选择一行", "请先选中一个模组，或直接点击表格中的启用状态。", parent=self.root)
+            self.dialogs.showinfo("选择一行", "请先选中一个模组，或直接点击表格中的启用状态。", parent=self.root)
             return
         self.toggle_item(highlighted[0])
 
@@ -524,17 +560,17 @@ class App:
 
     def start_update(self, online=True):
         if self.env is None:
-            messagebox.showinfo("先检测目录", "请先完成本机检测。", parent=self.root)
+            self.dialogs.showinfo("先检测目录", "请先完成本机检测。", parent=self.root)
             return
         if not self.selected:
-            messagebox.showinfo("选择模组", "请勾选需要更新的模组，或点击全选。", parent=self.root)
+            self.dialogs.showinfo("选择模组", "请勾选需要更新的模组，或点击全选。", parent=self.root)
             return
         try:
             downloads = max(1, min(12, self.download_slots.get()))
             installs = max(1, min(6, self.install_slots.get()))
             timeout = max(30, min(900, self.timeout.get()))
         except tk.TclError:
-            messagebox.showerror("设置无效", "并行数量和超时必须是数字。", parent=self.root)
+            self.dialogs.showerror("设置无效", "并行数量和超时必须是数字。", parent=self.root)
             return
         self.settings.update(download_slots=downloads, install_slots=installs, timeout=timeout)
         automatic_snapshot=self.auto_snapshot.get()
@@ -568,7 +604,7 @@ class App:
     def retry_failed(self):
         failures = {item for item, data in self.mods.items() if data["stage"] in ("失败", "等待超时", "已停止")}
         if not failures:
-            messagebox.showinfo("没有失败项", "当前没有需要重试的任务。", parent=self.root)
+            self.dialogs.showinfo("没有失败项", "当前没有需要重试的任务。", parent=self.root)
             return
         self.selected = failures
         self.render()
@@ -582,7 +618,7 @@ class App:
     def restore(self):
         highlighted = self.tree.selection()
         if self.env is None or len(highlighted) != 1:
-            messagebox.showinfo("选择一行", "请选中一行模组，再恢复上一版。", parent=self.root)
+            self.dialogs.showinfo("选择一行", "请选中一行模组，再恢复上一版。", parent=self.root)
             return
         item = highlighted[0]
 
@@ -598,7 +634,7 @@ class App:
         self.work(rollback)
 
     def choose_game(self):
-        directory = filedialog.askdirectory(title="选择包含 Barotrauma.exe 的游戏目录", parent=self.root)
+        directory = self.files.askdirectory(title="选择包含 Barotrauma.exe 的游戏目录", parent=self.root)
         if directory:
             self.settings["game_directory"] = directory
             atomic_json(self.settings_file, self.settings)
@@ -611,7 +647,7 @@ class App:
     def export_profile(self):
         if self.env is None or not self.mods:
             return
-        path = filedialog.asksaveasfilename(title="导出联机清单", defaultextension=".json",
+        path = self.files.asksaveasfilename(title="导出联机清单", defaultextension=".json",
                                            initialfile="潜渊症联机模组清单.json", parent=self.root)
         if path:
             def export():
@@ -620,7 +656,7 @@ class App:
             self.work(export)
 
     def compare_profile(self):
-        path = filedialog.askopenfilename(title="选择房主导出的联机清单", filetypes=[("模组清单", "*.json")], parent=self.root)
+        path = self.files.askopenfilename(title="选择房主导出的联机清单", filetypes=[("模组清单", "*.json")], parent=self.root)
         if not path or self.env is None:
             return
         try:
@@ -638,15 +674,15 @@ class App:
                 self.events.put({'kind':'text_report','title':'联机清单对比','text':text})
             self.work(compare)
         except Exception as error:
-            messagebox.showerror("无法读取清单", str(error), parent=self.root)
+            self.dialogs.showerror("无法读取清单", str(error), parent=self.root)
 
     def export_report(self):
-        path = filedialog.asksaveasfilename(title="导出更新报告", defaultextension=".json",
+        path = self.files.asksaveasfilename(title="导出更新报告", defaultextension=".json",
                                            initialfile="模组更新报告.json", parent=self.root)
         if path:
-            atomic_json(Path(path), self.last_summary or {
+            atomic_json(Path(path), self.locale.report(self.last_summary or {
                 "mods": [{"id": item, "name": data["mod"].name, "status": data["stage"],
-                          "detail": data["detail"]} for item, data in self.mods.items()]})
+                          "detail": data["detail"]} for item, data in self.mods.items()]}))
             self.log("已保存更新报告。")
 
     def drain(self):
@@ -753,7 +789,7 @@ class App:
             elif kind == "error":
                 self.status.set("任务未完成：" + event["message"])
                 self.log(event["message"])
-                messagebox.showerror("任务未完成", event["message"], parent=self.root)
+                self.dialogs.showerror("任务未完成", event["message"], parent=self.root)
             elif kind == "summary":
                 self.last_summary = event["summary"]
                 summary = self.last_summary
@@ -827,7 +863,15 @@ def self_check(report_path):
                 manager=ManagementDialog(app)
                 assert manager.profile_list.winfo_exists() and manager.snapshot_list.winfo_exists()
                 original = app.appearance.prefs
+                original_language = app.locale.language
+                language_checks = []
                 try:
+                    for language in ('zh','en'):
+                        app.set_language(language,persist=False)
+                        assert dialog.ids == order
+                        assert app.update_button.cget('text') == app.tr('开始并行更新')
+                        assert manager.window.title() == app.tr('配置、联机与快照')
+                        language_checks.append(language)
                     for theme in ('ocean','graphite','daylight'):
                         app.interface.apply({**original,'theme':theme},persist=False)
                         assert app.root.cget('background') == app.appearance.colours['bg']
@@ -836,6 +880,7 @@ def self_check(report_path):
                         assert app.tree['displaycolumns'][:3] == ('check','enable','name')
                         appearance_checks.append(theme)
                 finally:
+                    app.set_language(original_language,persist=False)
                     app.interface.apply(original,persist=False)
                     dialog.window.destroy(); manager.window.destroy()
                 assert all(value.evidence for value in app.assessments.values())
@@ -847,6 +892,7 @@ def self_check(report_path):
                         'seconds':round(time.monotonic()-started,3),
                         'analysis_cache':app.analysis_stats,
                         'appearance_checks':appearance_checks,
+                        'language_checks':language_checks,
                         "load_order": read_order(app.env, strict=False),
                         "luacs": asdict(luacs_status(app.env)),
                         "enabled": sum(data["mod"].enabled for data in app.mods.values()),
@@ -879,7 +925,12 @@ def main():
             kernel.CloseHandle(mutex)
             root = tk.Tk()
             root.withdraw()
-            messagebox.showinfo("助手已打开", "模组更新助手已经在运行，请使用已打开的窗口。", parent=root)
+            try:
+                settings=json.loads((STATE/'settings.json').read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                settings={}
+            language=Localizer(settings.get('language') if isinstance(settings,dict) else None)
+            Dialogs(language,messagebox).showinfo("助手已打开", "模组更新助手已经在运行，请使用已打开的窗口。", parent=root)
             root.destroy()
             return
     try:
