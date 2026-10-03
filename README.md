@@ -6,6 +6,8 @@
 
 在本仓库的 [Releases](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases) 下载对应版本的 Windows 压缩包，解压后双击「潜渊症模组更新助手.exe」。无需安装 Python。保持 Steam 已登录，更新、切换启用状态、保存顺序及安装 LuaCs 前请关闭游戏和专用服务器。详细操作见 [使用说明](使用说明.md)。
 
+也可通过 [Steam 创意工坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3812360206) 订阅分发包，按照页面步骤运行「安装到桌面.cmd」。这是独立工具，无需在游戏中启用分发包；桌面版在工坊下载新版后需手动重新复制。工坊介绍和封面见 [workshop](workshop)。
+
 ## 功能
 
 - 三页导航：模组管理、工具与脚本、设置与外观；固定常用更新按钮，右键及「更多操作」集中处理低频操作。

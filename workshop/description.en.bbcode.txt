@@ -1,0 +1,71 @@
+[h1]Less waiting. More diving.[/h1]
+Tired of updating a long mod list before every session, rearranging your load order, or finding out your friends have a different setup? Barotrauma Mod Assistant brings those tasks together in one desktop window.
+
+[b]This is a standalone tool for 64-bit Windows. The Workshop delivers its files; you run the program manually. You do not need to enable this Workshop package in the game or make it a required server mod.[/b]
+The assistant itself does not require Python, LuaCs, or C#. Its installer feature is for game mods that need LuaCs and C# scripting.
+
+[b]Language note: the current v0.5.0 program interface is in Chinese. This page provides English instructions and translations of the main buttons. It does not add an English interface to the app.[/b]
+
+[h1]Getting started[/h1]
+[olist]
+[*]Subscribe and wait for Steam to finish downloading. If needed, launch Barotrauma to the main menu, let it install Workshop content, then exit the game.
+[*]Press Win+R, paste this path, and press Enter:
+[code]%LOCALAPPDATA%\Daedalic Entertainment GmbH\Barotrauma\WorkshopMods\Installed\__WORKSHOP_ID__[/code]
+[*]Copy [b]BarotraumaModAssistant.exe[/b] to a folder of your choice, then double-click the copy. No separate runtime installation is needed.
+[/olist]
+Alternatively, double-click [b]安装到桌面.cmd[/b] ("Install to desktop"). It copies the assistant to your user program folder and creates a desktop shortcut named [b]潜渊症模组更新助手（工坊版）[/b]. It does not change game settings. The copied program is stored here:
+[code]%LOCALAPPDATA%\BarotraumaModAssistant\WorkshopProgram[/code]
+
+[b]Can't find the Workshop folder?[/b] In Steam, right-click Barotrauma > Manage > Browse local files. Go up two folders to steamapps, then open:
+[code]workshop\content\602960\__WORKSHOP_ID__[/code]
+Use the Steam library where this item was downloaded. You can also copy the executable from this download cache.
+
+[b]After a Workshop update:[/b] close the old assistant and replace your copied executable, or run 安装到桌面.cmd again. Steam updates the Workshop files, but your separate desktop copy must be updated too. Unsubscribing does not remove that copy or your saved assistant settings.
+
+[h1]Your first mod update[/h1]
+[olist]
+[*]Keep Steam open and signed in. Close Barotrauma and any dedicated server before updating files, changing enabled mods, switching profiles, saving the load order, or installing LuaCs.
+[*]Wait for the assistant to find your mods. [b]更新[/b] (Update) selects a mod for this update; [b]启用[/b] (Enabled) controls whether the game loads it next time. These are separate choices.
+[*]Click [b]开始并行更新[/b] (Start parallel updates). The defaults allow 4 concurrent Workshop requests and 3 concurrent installations. Adjust them in [b]设置与外观[/b] (Settings & appearance).
+[*]Open [b]加载顺序[/b] (Load order). Use [b]自动排序[/b] (Auto-sort) for a suggested order, or drag entries / move them up or down. Review the preview, then click [b]保存加载顺序[/b] (Save load order).
+[*]When finished, click [b]启动游戏[/b] (Launch game).
+[/olist]
+Other useful labels: [b]模组管理[/b] = Mod management; [b]工具与脚本[/b] = Tools & scripts, including LuaCs, logs, and reports; [b]外观设置[/b] = Appearance settings.
+
+[h1]What it can do[/h1]
+[list]
+[*][b]Parallel update requests and installations:[/b] submit several Workshop requests together, install completed downloads in parallel, reuse verified unchanged files, retry failed items, and keep installation backups.
+[*][b]Enable mods and manage load order:[/b] manage Workshop and local mods, drag entries, get sorting suggestions, set custom before/after rules, and lock positions.
+[*][b]Explain compatibility risks:[/b] compare XML identifiers and overrides, readable Lua hooks, and C# method patches. See overlapping behavior, relevant files, and suggested action. Mod categories and impact ratings help you understand what each mod changes.
+[*][b]Install LuaCs and enable C# scripting:[/b] get a matching Windows client patch from official LuaCs releases, verify it, back up replaced files, and install it. Supports persistent C# enablement, restoring pre-installation files, and post-install checks.
+[*][b]Profiles and multiplayer setup:[/b] save the core package, enabled mods, and load order. Import a friend's list, compare it, then subscribe to and download missing Workshop items after review.
+[*][b]Snapshots and troubleshooting:[/b] save mod-file snapshots before updates, restore saved combinations, read game/LuaCs logs, and export update, compatibility, or multiplayer reports. Backups use disk space.
+[*][b]Lighter checks while playing:[/b] reuse unchanged analysis and defer deep scanning while the game is running. Refresh the full analysis after closing the game.
+[*][b]Personalize the window:[/b] choose deep-blue, graphite, or light themes; change accent colors, font size, and list spacing. Use filters, context menus, shortcuts, selectable columns, and collapsible task history. Window size and column widths are remembered.
+[/list]
+
+[h1]Before you dive: common questions[/h1]
+[b]Why is there no new button inside the game?[/b]
+This is a desktop application. Subscribing or enabling the package does not automatically launch it. Follow the installation steps above.
+
+[b]Will every mod download faster?[/b]
+The assistant can submit requests and install files in parallel, but Steam controls network downloads. It cannot guarantee that all downloads run simultaneously or bypass Steam's queue, server limits, or your bandwidth. Requests already accepted by Steam may continue after you stop the assistant.
+
+[b]Does a good compatibility rating guarantee no conflicts?[/b]
+No. Compatibility ratings and auto-sort are suggestions based on static analysis. They cannot fully predict dynamic scripts, compiled code, or in-game behavior, and they do not repair mod code. Follow mod authors' instructions and test your setup in game. The impact rating describes the scope of a mod's changes, not its quality.
+
+[b]Does LuaCs installation configure everyone on my server?[/b]
+It only changes your local Windows client and stops if the patch version does not match. Other computers and dedicated servers need separate setup. The option enables [b]C# scripting[/b]. Use script mods from sources you trust. A successful file check is not a completed in-game script test.
+
+[b]Can it download an old version from my friend's list?[/b]
+Steam supplies the current Workshop version, not historical versions from a shared list. By default, version or fingerprint differences prevent a profile switch. Install local mods separately. Snapshots restore files you previously saved; they do not restore Steam subscriptions or the LuaCs client patch.
+
+[b]Why does Steam say Barotrauma is running without a game window?[/b]
+The assistant connects to the game's Steam Workshop interface, so Steam may show the game as running during that connection. This does not mean the assistant opened a game window.
+
+[h1]Version and feedback[/h1]
+Included program: [b]v0.5.0[/b]. Its release checks passed 89 unit/isolated tests and a standalone self-check; theme and window layouts were checked. This does not certify every mod combination. Real multiplayer testing with a friend's setup has not been completed.
+
+The package includes the Chinese 使用说明.md guide and SHA-256 checksums. It contains no base-game files, third-party Workshop mods, account credentials, or the creator's personal mod setup. The cover is an original AI-assisted illustration; this is a community tool, not an official game release.
+
+When reporting a problem, include the assistant version, steps to reproduce it, and the exact message shown. Review exported reports and remove personal information you do not want to share before posting them.
