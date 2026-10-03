@@ -22,7 +22,7 @@ from .mod_analysis import evaluate, inspect, inspect_all, luacs_runtime_detected
 from .mod_toggle import enabled_ids, set_enabled
 from .mod_order import read_order
 from .order_ui import OrderDialog
-from .luacs import LuaCsInstaller, status as luacs_status
+from .luacs import LuaCsInstaller, status as luacs_status, restore_info, RESTORE_GUIDE
 from .analysis_cache import inspect_cached
 from .management_ui import ManagementDialog
 from .profiles import capture_profile, normalize_profile, resolve_profile
@@ -32,6 +32,7 @@ from .steam import BUSY, DOWNLOADING, NEEDS_UPDATE, PENDING, SteamBridge
 from .appearance import Appearance
 from .main_ui import MainInterface
 from .i18n import Localizer, Dialogs, LANGUAGES
+from .preferences import load_preferences
 
 STATE = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "BarotraumaModAssistant"
 BG, PANEL, TEXT, MUTED, ACCENT = "#0b1422", "#142237", "#e8f0fa", "#8fa6bf", "#57dac4"
@@ -60,19 +61,25 @@ class App:
         self.stage_log = {}
         self.last_summary = None
         self.refresh_after_idle = False
-        STATE.mkdir(parents=True, exist_ok=True)
-        self.settings_file = STATE / "settings.json"
+        startup_warnings = []
+        self.settings_writable = True
         try:
-            self.settings = json.loads(self.settings_file.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            self.settings = {}
-        if not isinstance(self.settings,dict): self.settings = {}
+            STATE.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            self.settings_writable = False
+            startup_warnings.append('助手数据目录不可写；本次偏好仅在当前窗口有效，请检查目录权限。')
+        self.settings_file = STATE / "settings.json"
+        self.settings, warnings, writable = load_preferences(self.settings_file)
+        self.settings_writable = self.settings_writable and writable
+        startup_warnings.extend(warnings)
         self.locale = Localizer(self.settings.get('language'))
         self.tr = self.locale.text
         self.dialogs = Dialogs(self.locale, messagebox)
         self.files = Dialogs(self.locale, filedialog)
         self.log_history = []
         self.luacs_text = self.locale.variable(self.root, value="LuaCs 状态待检测")
+        self.luacs_backup_text = self.locale.variable(self.root, value='完成检测后显示恢复备份状态。')
+        self.storage_status = self.locale.variable(self.root, value='助手偏好可保存' if self.settings_writable else '助手偏好暂不可保存')
         self.appearance=Appearance(self.settings.get('appearance'))
         screen_width,screen_height=self.root.winfo_screenwidth(),self.root.winfo_screenheight()
         size=self.settings.get('window_size',[1360,800])
@@ -84,8 +91,12 @@ class App:
         self.logger = logging.getLogger("mod_assistant")
         self.logger.setLevel(logging.INFO)
         if not self.logger.handlers:
-            handler = RotatingFileHandler(STATE / "assistant.log", maxBytes=2_000_000,
-                                           backupCount=3, encoding="utf-8")
+            try:
+                handler = RotatingFileHandler(STATE / "assistant.log", maxBytes=2_000_000,
+                                               backupCount=3, encoding="utf-8")
+            except OSError:
+                handler = logging.NullHandler()
+                startup_warnings.append('文件日志无法保存；窗口内仍显示任务记录。')
             self.logger.addHandler(handler)
         self.status = self.locale.variable(self.root, value="正在准备本机检测…")
         self.summary = self.locale.variable(self.root, value="选择模组，然后开始并行更新")
@@ -98,6 +109,11 @@ class App:
         self.busy_buttons = []
         self.make_style()
         self.build()
+        self.set_busy(False)
+        for warning in startup_warnings:
+            self.log(warning)
+        if startup_warnings:
+            self.status.set('\n'.join(startup_warnings))
         self.root.after(80, self.drain)
         if auto_scan:
             self.root.after(120, self.scan)
@@ -118,7 +134,7 @@ class App:
         return tk.Label(parent, text=text, bg=options.pop("bg", BG),
                         fg=options.pop("fg", TEXT), font=options.pop("font", ("Microsoft YaHei UI", 10)), **options)
 
-    def button(self, parent, text, command, primary=False, busy=True):
+    def button(self, parent, text, command, primary=False, busy=True, requires_game=True):
         button = tk.Button(parent, text=text, command=command, bg=ACCENT if primary else "#20354e",
                            fg=BG if primary else TEXT, activebackground="#78e8d5" if primary else "#2e4c6b",
                            activeforeground=BG if primary else TEXT, relief="flat", bd=0,
@@ -127,6 +143,7 @@ class App:
         if busy:
             self.busy_buttons.append(button)
         button._appearance_primary=primary
+        button._requires_game=busy and requires_game
         return button
 
     def build(self):
@@ -155,7 +172,20 @@ class App:
         self.logs.configure(state='disabled')
         self.settings['language'] = language
         if persist:
+            self.save_settings()
+
+    def save_settings(self):
+        if not self.settings_writable:
+            return False
+        try:
             atomic_json(self.settings_file, self.settings)
+            return True
+        except OSError:
+            self.settings_writable = False
+            self.storage_status.set('助手偏好暂不可保存')
+            self.log('助手数据目录不可写；本次偏好仅在当前窗口有效，请检查目录权限。')
+            self.status.set('助手数据目录不可写；本次偏好仅在当前窗口有效，请检查目录权限。')
+            return False
 
     def log(self, message):
         self.logger.info(message)
@@ -185,8 +215,31 @@ class App:
     def set_busy(self, busy):
         self.busy_buttons = [button for button in self.busy_buttons if button.winfo_exists()]
         for button in self.busy_buttons:
-            button.configure(state="disabled" if busy else "normal")
+            button.configure(state="disabled" if busy or (getattr(button, '_requires_game', False) and not self.env) else "normal")
         self.stop_button.configure(state="normal" if busy else "disabled")
+        self.refresh_luacs_restore(busy)
+
+    def refresh_luacs_restore(self, busy=False):
+        info = restore_info(self.env) if self.env else None
+        self.luacs_backup_text.set(info.text if info else '完成检测后显示恢复备份状态。')
+        self.interface.restore_button.configure(state='normal' if info and info.available and not busy else 'disabled')
+
+    def environment_help(self):
+        lines = ['首次使用与环境检查',
+                 '1. 先安装 Steam 版游戏，打开 Steam 并登录拥有游戏的账号。',
+                 '2. 点击重新检测；自动定位失败时，在设置页选择包含 Barotrauma.exe 的目录。',
+                 '首次安装游戏后，先启动到主菜单再退出，让游戏生成配置文件。',
+                 '3. 新安装且没有订阅模组时，空列表是正常现象；先在工坊订阅并等待 Steam 下载。',
+                 '4. Steam 未连接时可查看本地模组；联网更新需要 Steam 正常运行。',
+                 '5. 关闭游戏和服务器后，再安装、启用、排序或恢复文件。',
+                 '6. 工坊更新不会覆盖已复制到桌面的程序；退出助手后重新运行桌面安装入口。',
+                 '7. 文件无法写入时检查目标目录权限、剩余空间或文件占用；不要反复安装。',
+                 '当前检测结果',
+                 '游戏目录：' + (str(self.env.game) if self.env else '尚未定位'),
+                 'Steam 已连接' if self.online else '本地检测模式',
+                 '助手偏好可保存' if self.settings_writable else '助手偏好暂不可保存',
+                 self.luacs_backup_text.get()]
+        self.text_report('首次使用与环境检查', '\n'.join(lines))
 
     def work(self, function):
         if self.worker is not None and self.worker.is_alive():
@@ -199,7 +252,9 @@ class App:
                 function()
             except Exception as error:
                 self.logger.error("%s\n%s", error, traceback.format_exc())
-                self.events.put({"kind": "error", "message": str(error)})
+                message = ('无法访问或写入所需文件；请检查目录权限和文件占用，关闭游戏后重试。'
+                           if isinstance(error, PermissionError) else str(error))
+                self.events.put({"kind": "error", "message": message})
             finally:
                 self.events.put({"kind": "idle"})
 
@@ -212,6 +267,11 @@ class App:
 
         def detect():
             env = discover(self.settings.get("game_directory", ""))
+            saved_game = self.settings.get('game_directory', '')
+            if saved_game and Path(saved_game).resolve() != env.game.resolve():
+                self.events.put({'kind':'log', 'message':'保存的游戏目录已失效，已改用 Steam 当前安装目录。'})
+            if not (env.game / 'config_player.xml').is_file():
+                raise AssistantError('游戏尚未生成配置文件；请先启动到主菜单再退出，然后重新检测。')
             try:
                 running = game_running()
             except AssistantError as error:
@@ -256,7 +316,8 @@ class App:
                 if bridge:
                     bridge.close()
             self.events.put({"kind": "scan_status", "message": "正在读取模组公开资料…"})
-            metadata, metadata_available = workshop_details(env, [mod.item_id for mod in mods], allow_network=not light)
+            metadata, metadata_available = workshop_details(env, [mod.item_id for mod in mods], allow_network=not light, force=force,
+                cancel=self.cancel, emit=lambda message:self.events.put({'kind':'log','message':message}))
             self.events.put({"kind": "scan_status", "message":
                              f"正在比对 {len(mods)} 个模组的资源和代码…"})
             analysis_mods = [replace(mod,source=env.installed/mod.item_id)
@@ -266,6 +327,8 @@ class App:
             detected = luacs_status(env)
             runtime_luacs = detected.runtime
             assessments = evaluate(mods, features, runtime_luacs, read_order(env,strict=False), detected.csharp)
+            if not mods:
+                self.events.put({'kind':'log', 'message':'尚未发现订阅或本地模组；新用户的空列表是正常现象，请先在工坊订阅并等待下载。'})
             self.events.put({"kind": "inventory", "env": env, "mods": mods, "online": online,
                              "metadata": metadata, "features": features,
                              "assessments": assessments, "runtime_luacs": runtime_luacs,
@@ -324,10 +387,11 @@ class App:
         highlighted = self.tree.selection()
         existing = set(self.tree.get_children())
         search = self.search.get().casefold()
+        filter_value = self.filter.get()
+        rendered = getattr(self, '_rendered_rows', {})
         for item, data in self.mods.items():
             mod = data["mod"]
             assessment = self.assessments.get(item)
-            filter_value = self.filter.get()
             filtered = (filter_value == '已启用' and not mod.enabled
                         or filter_value == '未启用' and mod.enabled
                         or filter_value == '需要处理' and not (
@@ -337,6 +401,7 @@ class App:
             if filtered or search and search not in (mod.name + " " + item).casefold():
                 if item in existing:
                     self.tree.delete(item)
+                    rendered.pop(item, None)
                 continue
             type_labels = assessment.kinds if assessment else ()
             shown_type = "、".join(type_labels[:2]) + (f" +{len(type_labels) - 2}" if len(type_labels) > 2 else "")
@@ -354,10 +419,15 @@ class App:
                 "active" if stage in ("下载中", "安装准备", "校验缓存") else
                 "warning" if assessment and assessment.compatibility.startswith(("低", "中")) else "")
             if self.tree.exists(item):
-                self.tree.item(item, values=values, tags=(tag,))
+                if rendered.get(item) != (values, tag):
+                    self.tree.item(item, values=values, tags=(tag,))
             else:
                 self.tree.insert("", "end", iid=item, values=values, tags=(tag,))
-        self.tree.selection_set([i for i in highlighted if self.tree.exists(i)])
+            rendered[item] = (values, tag)
+        self._rendered_rows = {item:value for item,value in rendered.items() if item in self.mods}
+        selection = tuple(i for i in highlighted if self.tree.exists(i))
+        if self.tree.selection() != selection:
+            self.tree.selection_set(selection)
         self.summary.set(f"{len(self.mods)} 个模组 · 启用 {sum(x['mod'].enabled for x in self.mods.values())} 个 · 已选更新 {len(self.selected)} 个")
 
     def click_checkbox(self, event):
@@ -516,8 +586,15 @@ class App:
     def restore_luacs(self):
         if self.env is None:
             return
+        info = restore_info(self.env)
+        if not info.available:
+            self.refresh_luacs_restore()
+            self.text_report('LuaCs 恢复说明', info.text + '\n\n' + RESTORE_GUIDE)
+            return
         def restore():
-            LuaCsInstaller(self.env).restore()
+            installer = LuaCsInstaller(self.env)
+            installer.cancel = self.cancel
+            installer.restore()
             detected = luacs_status(self.env)
             self.events.put({"kind": "luacs_ready", "runtime": detected.runtime,
                              'csharp':detected.csharp,
@@ -575,7 +652,7 @@ class App:
         self.settings.update(download_slots=downloads, install_slots=installs, timeout=timeout)
         automatic_snapshot=self.auto_snapshot.get()
         self.settings.update(auto_snapshot=automatic_snapshot,light_detection=self.light_detection.get())
-        atomic_json(self.settings_file, self.settings)
+        self.save_settings()
         ids = list(self.selected)
         self.stage_log.clear()
         self.status.set(f"正在处理 {len(ids)} 个模组 · 同时更新 {downloads} · 同时安装 {installs}")
@@ -636,8 +713,11 @@ class App:
     def choose_game(self):
         directory = self.files.askdirectory(title="选择包含 Barotrauma.exe 的游戏目录", parent=self.root)
         if directory:
+            if not (Path(directory) / 'Barotrauma.exe').is_file():
+                self.dialogs.showinfo('游戏目录不正确', '请选择包含 Barotrauma.exe 的游戏安装目录；之前的目录未改变。', parent=self.root)
+                return
             self.settings["game_directory"] = directory
-            atomic_json(self.settings_file, self.settings)
+            self.save_settings()
             self.scan()
 
     def launch(self):
@@ -813,7 +893,7 @@ class App:
         if self.root.winfo_viewable():
             self.settings['window_size']=[self.root.winfo_width(),self.root.winfo_height()]
             self.settings['column_widths']={key:self.tree.column(key,'width') for key in self.tree['columns']}
-        atomic_json(self.settings_file,self.settings)
+        self.save_settings()
         if self.worker and self.worker.is_alive():
             self.stop()
             self.root.after(120, self.finish_close)

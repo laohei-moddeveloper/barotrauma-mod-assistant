@@ -21,6 +21,56 @@ RELEASE_API = "https://api.github.com/repos/evilfactory/LuaCsForBarotrauma/relea
 ASSET_NAME = "luacsforbarotrauma_patch_windows_client.zip"
 MODERN_SETTINGS = "Data/Mods/LuaCsForBarotrauma/SettingsData.xml"
 
+RESTORE_GUIDE = "\n".join(('这个按钮只恢复最近一次由助手保存的原文件，不是通用卸载按钮。', '如果安装前已经有 LuaCs，助手可能只备份 C# 设置；恢复设置不会卸载已有 LuaCs。', '没有备份时，继续使用正常的 LuaCs 不需要处理，也不需要反复点击安装。', '若要移除客户端补丁：先关闭游戏和助手，再在 Steam 中打开游戏属性 → 已安装文件 → 验证游戏文件完整性。', '如果 Steam 启动选项含 LuaCs/Luatrauma 自动安装命令，先移除该命令；否则启动游戏时可能再次安装。', '依赖 LuaCs/C# 的模组需要脚本支持；卸载前先在游戏里停用这些模组。', '验证完整性还原游戏原版文件，与恢复助手安装前的状态不同。'))
+
+
+@dataclass
+class RestoreInfo:
+    available: bool
+    text: str
+    journal: dict | None = None
+
+
+def restore_info(env: Environment) -> RestoreInfo:
+    path = env.work / 'luacs/last-install.json'
+    try:
+        if not path.exists():
+            return RestoreInfo(False, '没有助手安装备份；恢复操作不可用。当前 LuaCs 不受影响。')
+        if path.stat().st_size > 1_000_000:
+            raise ValueError('Oversized journal')
+        journal = json.loads(path.read_text(encoding='utf-8'))
+        if not isinstance(journal, dict) or journal.get('state') not in ('complete', 'restored'):
+            raise ValueError('Invalid state')
+        if journal['state'] == 'restored':
+            return RestoreInfo(False, '最近一次助手备份已经恢复，暂无新的可恢复安装。')
+        backup = Path(journal['backup'])
+        if not within(backup, env.work / 'luacs/backups') or not backup.is_dir():
+            raise ValueError('Missing backup')
+        records = journal['records']
+        if not isinstance(records, list) or not records or len(records) > 502:
+            raise ValueError('Invalid records')
+        names = set()
+        for record in records:
+            name = record['name']
+            if not isinstance(name, str) or not name or name.casefold() in names:
+                raise ValueError('Invalid file')
+            relative = PurePosixPath(name.replace('\\', '/'))
+            if relative.is_absolute() or '..' in relative.parts or not relative.parts or ':' in name:
+                raise ValueError('Invalid path')
+            names.add(name.casefold())
+            if not within(env.game / name, env.game) or not within(backup / name, backup):
+                raise ValueError('Invalid path')
+            if type(record['existed']) is not bool or not re.fullmatch('[a-f0-9]{64}', record['new_hash']):
+                raise ValueError('Invalid record')
+            if record['existed'] and (not re.fullmatch('[a-f0-9]{64}', record['old_hash']) or not (backup / name).is_file()):
+                raise ValueError('Missing file')
+        text = ('助手完整安装备份可用；只恢复助手更改的文件，操作前会校验。'
+                if 'barotrauma.dll' in names else
+                '助手设置备份可用；恢复只撤销设置更改，不会卸载原有 LuaCs。')
+        return RestoreInfo(True, text, journal)
+    except (OSError, ValueError, TypeError, KeyError):
+        return RestoreInfo(False, '助手备份记录损坏或文件缺失，暂不可恢复；原文件未改动。')
+
 
 @dataclass
 class LuaCsStatus:
@@ -283,6 +333,8 @@ class LuaCsInstaller:
                 if not within(saved, backup) or _hash(saved) != record["old_hash"]:
                     raise AssistantError("LuaCs 备份校验失败")
         for record in reversed(records):
+            if not partial:
+                self.check()
             target = self.env.game / record["name"]
             if record["existed"]:
                 saved = backup / record["name"]
@@ -309,9 +361,10 @@ class LuaCsInstaller:
         self.check()
         self.recover()
         path = self.env.work / "luacs" / "last-install.json"
-        if not path.is_file():
-            raise AssistantError("助手还没有 LuaCs 安装备份")
-        journal = json.loads(path.read_text(encoding="utf-8"))
+        info = restore_info(self.env)
+        if not info.available:
+            raise AssistantError(info.text)
+        journal = info.journal
         self._restore(journal)
         journal["state"] = "restored"
         atomic_json(path, journal)

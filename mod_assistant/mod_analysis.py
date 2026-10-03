@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-from .core import APP_ID, Environment, Mod, atomic_json, load_package, within
+from .core import APP_ID, Cancelled, Environment, Mod, atomic_json, load_package, within
 
 
 KIND_BY_TAG = {
@@ -83,22 +83,34 @@ class Assessment:
     pairs: list[dict] = field(default_factory=list)
 
 
-def workshop_details(env: Environment, ids: list[str], allow_network=True) -> tuple[dict, bool]:
-    """Use only public workshop IDs. The cache keeps analysis useful offline."""
-    ids = [item for item in ids if item.isdecimal()]
+def workshop_details(env: Environment, ids: list[str], allow_network=True, force=False,
+                     cancel=None, emit=lambda message: None) -> tuple[dict, bool]:
+    """Reuse validated public metadata; temporary failures get a short retry delay."""
+    ids = list(dict.fromkeys(item for item in ids if isinstance(item, str) and item.isdecimal()))
     cache = env.work / "analysis" / "workshop-details.json"
     try:
         saved = json.loads(cache.read_text(encoding="utf-8"))
-        entries = saved.get("entries", {})
-        if not isinstance(entries, dict):
-            entries = {}
+        if not isinstance(saved, dict): saved = {}
     except (OSError, ValueError):
-        entries, saved = {}, {}
-    if not allow_network or (set(ids).issubset(entries)
-                             and time.time() - saved.get("fetched_at", 0) < 86400):
+        saved = {}
+    raw = saved.get('entries', {})
+    entries = {}
+    if isinstance(raw, dict):
+        for item, value in raw.items():
+            if (isinstance(item, str) and item.isdecimal() and isinstance(value, dict)
+                    and isinstance(value.get('tags', []), list) and isinstance(value.get('children', []), list)):
+                entries[item] = {'tags':[tag for tag in value.get('tags', []) if isinstance(tag, str)],
+                                 'children':[child for child in value.get('children', []) if isinstance(child, str) and child.isdecimal()]}
+    now = time.time()
+    fetched = saved.get('fetched_at', 0)
+    retry = saved.get('retry_after', 0)
+    recent = type(fetched) in (int, float) and 0 <= now - fetched < 86400
+    waiting = type(retry) in (int, float) and now < retry <= now + 60
+    if not ids or not allow_network or waiting or (not force and recent and set(ids).issubset(entries)):
         return entries, bool(entries)
     try:
         for index in range(0, len(ids), 75):
+            if cancel and cancel.is_set(): raise Cancelled('分析已停止')
             batch = ids[index:index + 75]
             data = {"itemcount": len(batch)}
             data.update({f"publishedfileids[{n}]": item for n, item in enumerate(batch)})
@@ -106,19 +118,36 @@ def workshop_details(env: Environment, ids: list[str], allow_network=True) -> tu
                 "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/",
                 data=urllib.parse.urlencode(data).encode("ascii"), method="POST")
             with urllib.request.urlopen(request, timeout=9) as response:
-                values = json.load(response).get("response", {}).get("publishedfiledetails", [])
+                payload = json.load(response)
+            if not isinstance(payload, dict) or not isinstance(payload.get('response'), dict):
+                raise ValueError('Invalid metadata response')
+            values = payload['response'].get('publishedfiledetails')
+            if not isinstance(values, list): raise ValueError('Invalid metadata list')
             for value in values:
+                if not isinstance(value, dict): continue
                 item = str(value.get("publishedfileid", ""))
                 if item in batch and value.get("result") == 1 and value.get("consumer_app_id") == APP_ID:
+                    tags, children = value.get('tags', []), value.get('children', [])
+                    if not isinstance(tags, list) or not isinstance(children, list):
+                        raise ValueError('Invalid dependency data')
                     entries[item] = {
-                        "tags": [x.get("tag", "") for x in value.get("tags", []) if isinstance(x, dict)],
-                        "children": [str(x.get("publishedfileid", "")) for x in value.get("children", [])
+                        "tags": [x['tag'] for x in tags if isinstance(x, dict) and isinstance(x.get('tag'), str)],
+                        "children": [str(x.get("publishedfileid", "")) for x in children
                                      if isinstance(x, dict) and str(x.get("publishedfileid", "")).isdecimal()],
                     }
-        atomic_json(cache, {"fetched_at": time.time(), "entries": entries})
-        return entries, True
-    except (OSError, ValueError, KeyError):
-        return entries, bool(entries)
+        state = {"fetched_at": time.time(), "entries": entries}
+        available = True
+    except (OSError, ValueError, KeyError, TypeError):
+        emit('公开资料查询暂不可用，沿用已有资料；一分钟内不重复请求。')
+        state = {'fetched_at': fetched if type(fetched) in (int, float) else 0,
+                 'retry_after': time.time() + 60, 'entries': entries}
+        available = bool(entries)
+    if cancel and cancel.is_set(): raise Cancelled('分析已停止')
+    try:
+        atomic_json(cache, state)
+    except OSError:
+        emit('公开资料缓存无法保存；本次已读取的资料仍可使用。')
+    return entries, available
 
 
 def _resource_path(folder: Path, name: str, own_name: str) -> Path | None:

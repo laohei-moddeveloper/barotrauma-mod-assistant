@@ -1,6 +1,6 @@
 # Barotrauma Mod Assistant
 
-Version **0.6.0** is a standalone mod manager for the Steam version of Barotrauma on **64-bit Windows**, with **English and Simplified Chinese** interfaces.
+Version **0.6.1** is a standalone mod manager for the Steam version of Barotrauma on **64-bit Windows**, with **English and Simplified Chinese** interfaces.
 
 [Download](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/latest) · [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3812360206&l=english) · [中文说明](使用说明.md)
 
@@ -24,7 +24,7 @@ Use the **中文 / English** selector at the top of the window. Language changes
 
 1. Keep Steam signed in. Close the game and dedicated server before changing files, enabled mods, profiles, order, or LuaCs.
 2. Wait for scanning. **Update** selects a mod for the task; **Enabled** controls whether the game loads it next time. These are separate choices.
-3. Click **Start parallel updates**. Defaults: 4 concurrent Workshop requests and 3 installations. Adjust these in **Settings & appearance**.
+3. Click **Update mods**. Defaults: 4 concurrent Workshop requests and 3 installations. Adjust these in **Settings & appearance**.
 4. Open **Load order** for drag-and-drop, **Auto-sort**, before/after rules, and locked positions. Click **Save load order** to apply it on the next game launch.
 5. Click **Launch game** when finished.
 
@@ -47,6 +47,12 @@ Steam controls actual downloads. Parallel requests, installations, and cache reu
 While playing, light scanning uses cached analysis and defers deep scanning. Refresh after closing the game for current results. Process checks and installation protections stay active in both languages. Mod names, file paths, identifiers, and original third-party log excerpts retain their original language.
 
 ## Updates and feedback
+
+Version 0.6.1 adds **Getting started & environment** in Settings and **LuaCs restore help** in Tools. Missing or damaged backups disable Restore and explain why. An existing LuaCs installation may have no assistant backup; reinstalling an already working runtime cannot recreate original files. A settings-only backup restores settings, not the pre-existing runtime. To remove the client patch, close the game and assistant, remove any auto-install command from Steam Launch Options, and verify game files in Steam. This restores original game files rather than the assistant's prior state. See the [LuaCs author's instructions](https://steamcommunity.com/sharedfiles/filedetails/?id=2559634234).
+
+New users should launch the game to its main menu and exit once before scanning. An empty list with no subscribed mods is normal. Moved Steam installations are detected again when a saved game path is no longer valid. Invalid operation settings fall back to defaults or valid limits; malformed settings files are preserved separately before replacement. If preferences cannot be saved, the interface keeps working for the session and shows the storage status. Unwritable analysis caches keep the current results usable.
+
+The mod list now updates changed rows instead of rewriting every row during progress. Scans avoid unnecessary texture file checks while retaining code/resource change detection. Repeated translations use a bounded cache. Temporary public-metadata failures reuse saved data with a one-minute retry delay; **Full reanalysis** refreshes metadata as well as local analysis when the service is available. These changes do not bypass Steam download limits.
 
 After a Workshop update, close the assistant and rerun the desktop installer or replace the copied executable. Steam updates Workshop files, not the separate desktop copy. Unsubscribing does not remove your desktop copy or preferences. Use supplied SHA-256 checksums to verify downloaded release files.
 

@@ -4,8 +4,8 @@ from tkinter import colorchooser, messagebox, ttk
 
 from . import VERSION
 from .appearance import COLUMNS, DEFAULTS, THEMES, TITLES, normalize
-from .core import atomic_json
 from .i18n import LANGUAGES
+from .luacs import RESTORE_GUIDE
 
 BG, PANEL, TEXT, MUTED = '#0b1422', '#142237', '#e8f0fa', '#8fa6bf'
 
@@ -60,7 +60,8 @@ class MainInterface:
         app=self.app
         header=self.frame(app.root,padx=22,pady=6); header.pack(fill='x')
         identity=self.frame(header); identity.pack(side='left')
-        app.label(identity,'潜渊症 · 模组助手',font=('Microsoft YaHei UI',20,'bold')).pack(anchor='w')
+        self.identity_label=app.label(identity,'潜渊症 · 模组助手',font=('Microsoft YaHei UI',20,'bold'))
+        self.identity_label.pack(anchor='w')
         app.button(header,'外观设置',lambda:self.notebook.select(self.settings_page),busy=False).pack(side='right')
         self.language=tk.StringVar(value=LANGUAGES[app.locale.language])
         self.language_picker=ttk.Combobox(header,textvariable=self.language,
@@ -73,7 +74,7 @@ class MainInterface:
         toolbar=self.frame(app.root,padx=22,pady=2); toolbar.pack(fill='x')
         app.update_button=app.button(toolbar,'开始并行更新',lambda:app.start_update(True),primary=True)
         app.update_button.pack(side='left',padx=(0,10))
-        app.refresh_button=app.button(toolbar,'重新检测',app.scan); app.refresh_button.pack(side='left',padx=(0,10))
+        app.refresh_button=app.button(toolbar,'重新检测',app.scan,requires_game=False); app.refresh_button.pack(side='left',padx=(0,10))
         app.button(toolbar,'启动游戏',app.launch).pack(side='left')
         app.stop_button=app.button(toolbar,'停止任务',app.stop,busy=False)
         app.stop_button.pack(side='right'); app.stop_button.configure(state='disabled')
@@ -167,9 +168,14 @@ class MainInterface:
         grid=self.frame(body); grid.pack(fill='x'); grid.columnconfigure((0,1),weight=1,uniform='tools')
         lua=self.card(grid,'LuaCs 脚本支持','安装客户端、开启 C#，或检查游戏启动后的脚本状态。',0)
         app.label(lua,textvariable=app.luacs_text,bg=PANEL,fg=MUTED,wraplength=400,justify='left').pack(anchor='w',pady=(0,14))
+        app.label(lua,textvariable=app.luacs_backup_text,bg=PANEL,fg=MUTED,wraplength=400,justify='left').pack(anchor='w',pady=(0,8))
+        app.button(lua,'LuaCs 恢复说明',lambda:app.text_report('LuaCs 恢复说明', RESTORE_GUIDE),busy=False).pack(anchor='w',pady=5)
         for title,command,primary in [('一键安装 LuaCs + C#',app.install_luacs,True),
                                      ('安装后验证指引',app.verify_luacs,False),('恢复 LuaCs 安装前',app.restore_luacs,False)]:
-            app.button(lua,title,command,primary).pack(anchor='w',pady=5)
+            button=app.button(lua,title,command,primary)
+            button.pack(anchor='w',pady=5)
+            if command == app.restore_luacs:
+                self.restore_button=button
         checks=self.card(grid,'检查与报告','遇到问题先看日志；需要分享时可导出模组与更新信息。',1)
         for title,command in [('游戏 / LuaCs 日志诊断',app.diagnose_logs),('选择其他日志',lambda:app.diagnose_logs(choose=True)),
                               ('完整重新分析',lambda:app.scan(force=True)),('仅同步本地缓存',lambda:app.start_update(False)),
@@ -218,8 +224,10 @@ class MainInterface:
             checkbox=tk.Checkbutton(operations,text=title,variable=variable,bg=PANEL,fg=TEXT,
                                     selectcolor=BG,activebackground=PANEL,font=('Microsoft YaHei UI',10))
             checkbox.pack(anchor='w',pady=7); app.busy_buttons.append(checkbox)
-        app.button(operations,'保存更新设置',self.save_operations).pack(anchor='w',pady=(12,6))
-        app.button(operations,'选择游戏目录',app.choose_game).pack(anchor='w',pady=6)
+        app.button(operations,'保存更新设置',self.save_operations,requires_game=False).pack(anchor='w',pady=(12,6))
+        app.button(operations,'选择游戏目录',app.choose_game,requires_game=False).pack(anchor='w',pady=6)
+        app.button(operations,'首次使用与环境检查',app.environment_help,busy=False).pack(anchor='w',pady=6)
+        app.label(operations,textvariable=app.storage_status,bg=PANEL,fg=MUTED,wraplength=400,justify='left').pack(anchor='w',pady=6)
         app.label(operations,'F5 重新检测 · Ctrl+U 开始更新\nEsc 停止助手任务 · Ctrl+F 搜索模组',bg=PANEL,fg=MUTED,
                   justify='left',font=('Microsoft YaHei UI',9)).pack(anchor='w',pady=(16,0))
 
@@ -245,8 +253,9 @@ class MainInterface:
             else:
                 app.logs.pack_forget(); self.log_panel.pack_forget(); self.log_button.configure(text='任务记录 ▾')
             app.locale.localize(app.root)
+            self.fit_header(app.root.winfo_width())
             app.settings['appearance']=prefs
-            if persist: atomic_json(app.settings_file,app.settings)
+            if persist: app.save_settings()
         finally: self.updating=False
 
     def change_columns(self):
@@ -269,7 +278,7 @@ class MainInterface:
             self.app.dialogs.showerror('设置无效','并行数量和超时必须填写数字。',parent=app.root); return
         app.download_slots.set(values['download_slots']); app.install_slots.set(values['install_slots']); app.timeout.set(values['timeout'])
         app.settings.update(values,auto_snapshot=app.auto_snapshot.get(),light_detection=app.light_detection.get())
-        atomic_json(app.settings_file,app.settings); app.log('更新设置已保存。')
+        if app.save_settings(): app.log('更新设置已保存。')
         app.status.set('更新设置已保存')
 
     def context_menu(self,event):
@@ -289,5 +298,11 @@ class MainInterface:
 
     def resize(self,event):
         if event.widget is self.app.root:
+            self.fit_header(event.width)
             self.status_label.configure(wraplength=max(600,event.width-170))
             self.app.detail_label.configure(wraplength=max(650,event.width-85))
+
+    def fit_header(self, width):
+        size = self.app.appearance.prefs['font_size'] + (6 if width < 1150 else 10)
+        self.identity_label.configure(font=('Microsoft YaHei UI',size,'bold'))
+        self.app.search_entry.configure(width=14 if width < 1150 else 22)

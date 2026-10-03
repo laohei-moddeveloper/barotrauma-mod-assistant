@@ -7,6 +7,7 @@ import string
 import tkinter as tk
 from tkinter import ttk, font as tkfont
 import weakref
+from collections import OrderedDict
 
 from .i18n_catalog import EN
 
@@ -81,12 +82,26 @@ class Localizer:
         self.variables = []
         self.documents = weakref.WeakKeyDictionary()
         self.reverse = {value: key for key, value in EN.items() if '{' not in key}
+        self.translations = OrderedDict()
 
     def source(self, text):
         return self.reverse.get(text, text)
 
     def text(self, text, depth=0):
         text = str(text)
+        if depth or len(text) > 4096:
+            return self._text(text, depth)
+        key = (self.language, text)
+        if key in self.translations:
+            self.translations.move_to_end(key)
+            return self.translations[key]
+        value = self._text(text, depth)
+        self.translations[key] = value
+        if len(self.translations) > 1024:
+            self.translations.popitem(last=False)
+        return value
+
+    def _text(self, text, depth=0):
         if self.language == 'zh' or not re.search(r'[\u4e00-\u9fff]', text):
             return text
         if text in EN:
@@ -208,7 +223,8 @@ class Localizer:
                 widget._language_values = (source, translated)
             if isinstance(widget, tk.Button):
                 siblings = sum(isinstance(child,tk.Button) for child in widget.master.winfo_children())
-                widget.configure(wraplength=(100 if siblings>=5 else 180) if self.language=='en' else 0)
+                horizontal = widget.winfo_manager() == 'pack' and widget.pack_info().get('side') in ('left', 'right')
+                widget.configure(wraplength=(100 if siblings>=5 and horizontal else 180) if self.language=='en' else 0)
             for child in widget.winfo_children():
                 walk(child)
         walk(window)

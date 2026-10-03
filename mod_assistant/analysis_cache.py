@@ -2,6 +2,7 @@
 from dataclasses import asdict, fields
 import hashlib
 import json
+from pathlib import Path
 import xml.etree.ElementTree as ET
 from .core import AssistantError, Cancelled, atomic_json, load_package, within
 from .mod_analysis import Features, KIND_BY_TAG, inspect
@@ -40,14 +41,17 @@ def decode(data):
     for key in ('kinds','tags'): result[key] = tuple(result.get(key, []))
     return Features(**result)
 
-def signature(mod, metadata):
+def signature(mod, metadata, cancel=None):
     rows = []
     if mod.source and mod.source.is_dir():
-        for path in sorted(mod.source.rglob('*')):
-            if path.is_file() and path.suffix.casefold() in ('.xml','.lua','.cs','.dll') and within(path,mod.source):
+        for path in mod.source.rglob('*'):
+            if cancel and cancel.is_set(): raise Cancelled('分析已停止')
+            if path.suffix.casefold() in ('.xml','.lua','.cs','.dll') and path.is_file() and within(path,mod.source):
                 stat = path.stat()
                 rows.append((path.relative_to(mod.source).as_posix(),stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
-    value = [str(mod.source),mod.name,rows,metadata]
+    # Match the existing Path ordering, including Windows case folding, so
+    # optimization does not invalidate unchanged caches from earlier versions.
+    value = [str(mod.source),mod.name,sorted(rows,key=lambda row:Path(row[0])),metadata]
     return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
 def inspect_cached(env, mods, metadata=None, light=False, force=False, cancel=None, emit=lambda message: None):
@@ -79,12 +83,15 @@ def inspect_cached(env, mods, metadata=None, light=False, force=False, cancel=No
             feature.deferred = True
             stats['deferred'] += 1
         else:
-            current = signature(mod,entry)
+            current = signature(mod,entry,cancel)
             if cached and not force and saved.get('signature') == current:
                 feature = cached; stats['reused'] += 1
             else:
                 emit('分析变化的模组：'+mod.name)
                 feature = inspect(mod,entry); stats['scanned'] += 1
-                atomic_json(path,{'schema':SCHEMA,'source':str(mod.source),'signature':current,'feature':encode(feature)})
+                try:
+                    atomic_json(path,{'schema':SCHEMA,'source':str(mod.source),'signature':current,'feature':encode(feature)})
+                except OSError:
+                    emit('分析缓存无法保存；本次分析结果仍可使用，下次可能重新分析。')
         results[mod.item_id] = feature
     return results, stats

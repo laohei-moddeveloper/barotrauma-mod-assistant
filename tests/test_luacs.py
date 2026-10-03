@@ -6,7 +6,7 @@ import unittest
 from zipfile import ZipFile
 
 from mod_assistant.core import AssistantError, Environment
-from mod_assistant.luacs import LuaCsInstaller, MODERN_SETTINGS, status
+from mod_assistant.luacs import LuaCsInstaller, MODERN_SETTINGS, status, restore_info
 
 
 class LuaCsTests(unittest.TestCase):
@@ -109,5 +109,57 @@ class LuaCsTests(unittest.TestCase):
         self.assertTrue(status(self.env).csharp)
         self.assertIn(b'UseCaching Value="false"', path.read_bytes())
 
+    def test_existing_ready_runtime_has_no_invented_original_backup(self):
+        (self.env.game/'Barotrauma.dll').write_bytes(b'LuaCs already installed')
+        for name in ('BarotraumaCore.dll','MoonSharp.Interpreter.dll'):
+            (self.env.game/name).write_bytes(b'existing')
+        (self.env.game/'LuaCsSetupConfig.xml').write_text('<LuaCsSetupConfig EnableCsScripting="true"/>')
+        self.installer.release_loader=lambda:self.fail('must not redownload')
+        self.assertFalse(self.installer.install()['changed'])
+        self.assertFalse(restore_info(self.env).available)
+        with self.assertRaisesRegex(AssistantError,'没有助手安装备份'):self.installer.restore()
+        self.assertEqual((self.env.game/'Barotrauma.dll').read_bytes(),b'LuaCs already installed')
+
+    def test_restore_scope_and_already_restored_state(self):
+        self.installer.install()
+        self.assertIn('完整安装备份',restore_info(self.env).text)
+        self.installer.restore()
+        self.assertFalse(restore_info(self.env).available)
+        self.assertIn('已经恢复',restore_info(self.env).text)
+        for name,data in [('Barotrauma.dll',b'LuaCs previously installed'),('BarotraumaCore.dll',b'core'),('MoonSharp.Interpreter.dll',b'lua')]:
+            (self.env.game/name).write_bytes(data)
+        self.installer.install()
+        self.assertIn('设置备份',restore_info(self.env).text)
+        self.installer.restore()
+        self.assertTrue(status(self.env).runtime)
+        self.assertEqual((self.env.game/'Barotrauma.dll').read_bytes(),b'LuaCs previously installed')
+
+    def test_damaged_or_missing_backup_never_changes_game_files(self):
+        import json
+        self.installer.install()
+        path=self.env.work/'luacs/last-install.json'
+        journal=json.loads(path.read_text())
+        old=(self.env.game/'Barotrauma.dll').read_bytes()
+        for data in [[],{'state':'complete','records':None,'backup':journal['backup']},
+                     {**journal,'backup':str(self.env.game)}, {**journal,'records':[{'name':'../escape'}]}]:
+            path.write_text(json.dumps(data))
+            self.assertFalse(restore_info(self.env).available)
+            with self.assertRaises(AssistantError):self.installer.restore()
+            self.assertEqual((self.env.game/'Barotrauma.dll').read_bytes(),old)
+        path.write_text(json.dumps(journal))
+        (Path(journal['backup'])/'Barotrauma.dll').unlink()
+        self.assertFalse(restore_info(self.env).available)
+        with self.assertRaises(AssistantError):self.installer.restore()
+        self.assertEqual((self.env.game/'Barotrauma.dll').read_bytes(),old)
+
+
+    def test_restore_stops_if_game_starts_before_first_replacement(self):
+        self.installer.install()
+        original=(self.env.game/'Barotrauma.dll').read_bytes()
+        checks=iter([False,True])
+        self.installer.process_guard=lambda:next(checks,True)
+        with self.assertRaisesRegex(AssistantError,'关闭游戏'):self.installer.restore()
+        self.assertEqual((self.env.game/'Barotrauma.dll').read_bytes(),original)
+        self.assertTrue(restore_info(self.env).available)
 
 if __name__ == "__main__": unittest.main()

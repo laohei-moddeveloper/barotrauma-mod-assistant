@@ -29,7 +29,7 @@ Use the Steam library where this item was downloaded. You can also copy the exec
 [olist]
 [*]Keep Steam open and signed in. Close Barotrauma and any dedicated server before updating files, changing enabled mods, switching profiles, saving the load order, or installing LuaCs.
 [*]Wait for the assistant to find your mods. [b]Update[/b] selects a mod for this update; [b]Enabled[/b] controls whether the game loads it next time. These are separate choices.
-[*]Click [b]Start parallel updates[/b]. The defaults allow 4 concurrent Workshop requests and 3 concurrent installations. Adjust them in [b]Settings & appearance[/b].
+[*]Click [b]Update mods[/b]. The defaults allow 4 concurrent Workshop requests and 3 concurrent installations. Adjust them in [b]Settings & appearance[/b].
 [*]Open [b]Load order[/b]. Use [b]Auto-sort[/b] for a suggested order, or drag entries / move them up or down. Review the preview, then click [b]Save load order[/b].
 [*]When finished, click [b]Launch game[/b].
 [/olist]
@@ -61,13 +61,16 @@ No. Compatibility ratings and auto-sort are suggestions based on static analysis
 It only changes your local Windows client and stops if the patch version does not match. Other computers and dedicated servers need separate setup. The option enables [b]C# scripting[/b]. Use script mods from sources you trust. A successful file check is not a completed in-game script test.
 
 [b]Can it download an old version from my friend's list?[/b]
-Steam supplies the current Workshop version, not historical versions from a shared list. By default, version or fingerprint differences prevent a profile switch. Install local mods separately. Snapshots restore files you previously saved; they do not restore Steam subscriptions or the LuaCs client patch.
+Steam supplies the current Workshop version, not historical versions from a shared list. By default, version or fingerprint differences prevent a profile switch. Install local mods separately. Snapshots restore saved files, not Steam subscriptions or the LuaCs client patch.
 
 [b]Why does Steam say Barotrauma is running without a game window?[/b]
-The assistant connects to the game's Steam Workshop interface, so Steam may show the game as running during that connection. This does not mean the assistant opened a game window.
+Steam may show Barotrauma as running while the assistant uses its Workshop interface, without a game window.
+
+[b]No LuaCs backup?[/b]
+Restore covers only files saved by this assistant. An existing installation may have no backup. Keep using it, or read Restore help to remove the patch. Settings-only backups do not uninstall LuaCs.
 
 [h1]Version and feedback[/h1]
-Included program: [b]v0.6.0[/b]. Release checks cover 96 unit/isolated tests, both languages, themes, open dialogs, and small-window layouts. This does not certify every mod combination. Real multiplayer testing with a friend's setup has not been completed.
+Included program: [b]v0.6.1[/b]. 123 tests cover first-use guidance, backup states, settings recovery, both languages, and UI/scanning improvements. This does not certify every mod combination. Real multiplayer testing with a friend's setup has not been completed.
 
 Includes README_EN.md, a Chinese guide, and SHA-256 checksums. No base-game files, third-party mods, credentials, or personal setups. A community tool with an original AI-assisted cover.
 

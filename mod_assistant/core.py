@@ -221,44 +221,63 @@ class Environment:
         return f'{record.get("manifest", "")}:{record.get("timeupdated", 0)}'
 
 
-def discover(game_override: str = "") -> Environment:
+def steam_locations():
     import winreg
-    steam = None
+    roots = []
     for hive, key in [(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam"),
                       (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Valve\Steam")]:
         try:
             with winreg.OpenKey(hive, key) as handle:
                 for value in ("SteamPath", "InstallPath"):
                     try:
-                        steam = Path(winreg.QueryValueEx(handle, value)[0])
-                        break
-                    except OSError:
+                        raw = winreg.QueryValueEx(handle, value)[0]
+                        if isinstance(raw, str) and raw.strip():
+                            path = Path(raw)
+                            if path not in roots:
+                                roots.append(path)
+                    except (OSError, ValueError):
                         continue
         except OSError:
             continue
-        if steam:
-            break
+    for key in ('PROGRAMFILES(X86)', 'PROGRAMFILES', 'ProgramW6432'):
+        if os.environ.get(key):
+            path = Path(os.environ[key]) / 'Steam'
+            if path not in roots:
+                roots.append(path)
+    return roots
+
+
+def discover(game_override: str = "") -> Environment:
+    steam = next((path for path in steam_locations() if (path / 'steam.exe').is_file()), None)
     if steam is None:
         raise AssistantError("没有找到 Steam，请先安装并登录 Steam")
     libraries = [steam]
     library_file = steam / "steamapps" / "libraryfolders.vdf"
     if library_file.is_file():
         for value in read_vdf(library_file).get("libraryfolders", {}).values():
-            if isinstance(value, dict) and "path" in value:
-                path = Path(value["path"])
+            raw = value.get('path') if isinstance(value, dict) else value if isinstance(value, str) else None
+            if isinstance(raw, str) and raw and (isinstance(value, dict) or raw != '0' and ('/' in raw or '\\' in raw)):
+                path = Path(raw)
                 if path not in libraries:
                     libraries.append(path)
-    game = Path(game_override) if game_override else None
+    game = Path(game_override) if isinstance(game_override, str) and game_override and (Path(game_override) / 'Barotrauma.exe').is_file() else None
     if game is None:
         for library in libraries:
             path = library / "steamapps" / f"appmanifest_{APP_ID}.acf"
             if path.is_file():
                 name = read_vdf(path).get("AppState", {}).get("installdir", "Barotrauma")
-                game = library / "steamapps" / "common" / name
+                if isinstance(name, str):
+                    candidate = library / "steamapps" / "common" / name
+                    if (candidate / 'Barotrauma.exe').is_file():
+                        game = candidate
+                        break
+            candidate = library / 'steamapps/common/Barotrauma'
+            if (candidate / 'Barotrauma.exe').is_file():
+                game = candidate
                 break
     if game is None or not (game / "Barotrauma.exe").is_file():
         raise AssistantError("没有找到《潜渊症》，请在设置中选择游戏目录")
-    player = Path(os.environ["LOCALAPPDATA"]) / "Daedalic Entertainment GmbH" / "Barotrauma"
+    player = Path(os.environ.get('LOCALAPPDATA') or Path.home() / 'AppData/Local') / "Daedalic Entertainment GmbH" / "Barotrauma"
     return Environment(steam, game, libraries, player)
 
 

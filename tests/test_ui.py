@@ -1,4 +1,5 @@
 import tkinter as tk
+import gc
 from unittest.mock import patch
 from test_management import Fixture
 from mod_assistant.app import App
@@ -25,6 +26,11 @@ class UiTests(Fixture):
         self.root.destroy()
         for handler in list(self.app.logger.handlers):
             handler.close(); self.app.logger.removeHandler(handler)
+        self.app = None
+        self.root = None
+        # Collect closed Tk fixtures on the main thread before the next test
+        # starts installer workers; Tk variables cannot be finalized on workers.
+        gc.collect()
         self.state_patch.stop(); super().tearDown()
 
     def test_drag_preview_respects_lock_and_never_writes_live_order(self):

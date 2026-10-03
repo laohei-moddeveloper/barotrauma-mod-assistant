@@ -3,7 +3,7 @@
   "id": "3812360206",
   "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=3812360206",
   "title": "潜渊症模组助手｜并行更新・智能排序・LuaCs 一键安装【独立工具】【AI辅助制作】",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "visibility": "public",
   "upload_confirmed": true,
   "legal_acceptance_required": false,
@@ -16,5 +16,5 @@
     "zh",
     "en"
   ],
-  "executable_sha256": "ff87239b5dcca31f187875b468867601504494e41cacdeb4d018d8162d79e79c"
+  "executable_sha256": "cfa1169ab8523bcc6cf2ab55ed1f99460b89b2e49b663c19be29b85585f72b1c"
 }

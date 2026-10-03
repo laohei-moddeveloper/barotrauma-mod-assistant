@@ -30,7 +30,10 @@ class SteamBridge:
         self.initialized = False
 
     def bind(self, name, result, arguments):
-        function = getattr(self.dll, name)
+        try:
+            function = getattr(self.dll, name)
+        except AttributeError as error:
+            raise AssistantError('游戏自带的 Steam 接口版本不受支持；请更新 Steam 和游戏，或验证游戏文件完整性。') from error
         function.restype = result
         function.argtypes = arguments
         return function
@@ -38,7 +41,10 @@ class SteamBridge:
     def connect(self):
         os.environ["SteamAppId"] = str(APP_ID)
         os.environ["SteamGameId"] = str(APP_ID)
-        self.dll = C.CDLL(str(self.env.game / "steam_api64.dll"))
+        try:
+            self.dll = C.CDLL(str(self.env.game / "steam_api64.dll"))
+        except OSError as error:
+            raise AssistantError('无法加载游戏的 Steam 接口文件；请确认使用 Windows 64 位 Steam 版游戏，并验证游戏文件完整性。') from error
         self.shutdown_api = self.bind("SteamAPI_Shutdown", None, [])
         init = self.bind("SteamAPI_InitFlat", C.c_int, [C.c_char_p])
         error = C.create_string_buffer(1024)

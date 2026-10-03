@@ -87,7 +87,7 @@ class LanguageUiTests(test_ui.UiTests):
             self.assertEqual(app.selected,{'101'}); self.assertEqual(app.tree.get_children(),('102',))
             self.assertEqual(app.tree.item('102','values')[2],app.mods['102']['mod'].name)
             self.assertEqual(raw_stages,{key:value['stage'] for key,value in app.mods.items()})
-            self.assertEqual(app.update_button.cget('text'), 'Start parallel updates' if language=='en' else '开始并行更新')
+            self.assertEqual(app.update_button.cget('text'), 'Update mods' if language=='en' else '开始并行更新')
             self.assertEqual(manager.window.title(),'Profiles, multiplayer & snapshots' if language=='en' else '配置、联机与快照')
             self.assertEqual(order.window.title(),'Mod load order' if language=='en' else '模组加载顺序')
         app.worker=None; manager.window.destroy(); order.window.destroy()
@@ -98,7 +98,7 @@ class LanguageUiTests(test_ui.UiTests):
         root=tk.Toplevel(app.root); root.withdraw()
         reopened=test_ui.App(root,auto_scan=False)
         self.assertEqual(reopened.locale.language,'en')
-        self.assertEqual(reopened.update_button.cget('text'),'Start parallel updates')
+        self.assertEqual(reopened.update_button.cget('text'),'Update mods')
         reopened.close()
         from mod_assistant.appearance import DEFAULTS
         app.interface.apply(DEFAULTS)
