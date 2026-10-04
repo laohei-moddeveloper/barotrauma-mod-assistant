@@ -351,14 +351,26 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
     active = {mod.item_id for mod in mods if mod.enabled}
     names = {feature.name.casefold(): item for item, feature in features.items()}
     pair_signals = defaultdict(list)
-    for index, left in enumerate(mods):
-        first = features.get(left.item_id, Features(left.item_id, left.name))
-        for right in mods[index + 1:]:
-            second = features.get(right.item_id, Features(right.item_id, right.name))
-            score, reason = pair_evidence(first, second)
-            if score:
-                pair_signals[left.item_id].append((score, right, reason))
-                pair_signals[right.item_id].append((score, left, reason))
+    # Only shared facts can trigger pair_evidence. Index those facts once, rather
+    # than comparing every unrelated pair. Preserve original pair iteration order.
+    index = defaultdict(list)
+    candidates = set()
+    for number, mod in enumerate(mods):
+        feature = features.get(mod.item_id)
+        if feature is None:
+            continue
+        for kind in ('definitions', 'hook_names', 'patches', 'globals_written'):
+            for value in getattr(feature, kind):
+                key = (kind, value)
+                for previous in index[key]:
+                    candidates.add((previous, number))
+                index[key].append(number)
+    for first_index, second_index in sorted(candidates):
+        left, right = mods[first_index], mods[second_index]
+        score, reason = pair_evidence(features[left.item_id], features[right.item_id])
+        if score:
+            pair_signals[left.item_id].append((score, right, reason))
+            pair_signals[right.item_id].append((score, left, reason))
     result = {}
     for mod in mods:
         feature = features.get(mod.item_id, Features(mod.item_id, mod.name, partial=True))
@@ -420,7 +432,7 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
                          "中·当前重叠" if mod.enabled and active_signal >= 2 else
                          "中·潜在重叠" if max_signal >= 2 else
                          "中·需核对" if severity == 1 else
-                         "未知·资料不足" if feature.partial or feature.opaque_code else "高·未见冲突")
+                         "未知·资料不足" if feature.partial or feature.opaque_code else "未见直接冲突·待实测")
         if feature.deferred: compatibility='待刷新·缓存结论'
         result[mod.item_id] = Assessment(mod.item_id, feature.kinds, importance,
                                          compatibility, reasons, max(0, len(mods) - 1), len(signals))
@@ -441,8 +453,13 @@ def pair_detail(left, right, order, other_active=True):
         elif right_only: winner = right.name
         elif shared <= left.overrides & right.overrides and left.item_id in order and right.item_id in order:
             winner = left.name if order.index(left.item_id) < order.index(right.item_id) else right.name
+    special_override = any(key[0]=='afflictions' for key in shared) and bool(shared & (left.overrides|right.overrides))
+    if special_override:
+        winner = ''
     if shared - left.overrides - right.overrides:
         advice = "同标识普通定义需兼容补丁或禁用其中一个；移动顺序通常不足以解决。"
+    elif special_override:
+        advice = '含医疗/状态 Override：具体加载条件可能与物品不同。请核对作者说明和当前游戏版本；助手不单凭上下位置判定覆盖结果。'
     elif winner:
         advice = f"可识别的 XML Override 预计由 {winner} 优先；请确认这符合你的期望，多个 Override 可调整相对顺序。"
     else:

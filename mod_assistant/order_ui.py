@@ -4,27 +4,34 @@ import json
 from pathlib import Path
 from tkinter import messagebox, ttk
 
-from .mod_order import read_order, save_order, suggest_order, load_rules, save_rules, validate_order, check_rules
+from .mod_order import read_order, suggest_order, load_rules, save_rules, validate_order, check_rules
 from .core import atomic_json, AssistantError
+from .drafts import commit_draft
+from .profiles import installed_path
 
 
 class OrderDialog:
     def __init__(self, app):
         self.app = app
+        self.baseline = (app.env.game/'config_player.xml').read_bytes()
         self.ids = read_order(app.env)
+        if (app.env.game/'config_player.xml').read_bytes() != self.baseline:
+            raise AssistantError('游戏配置已经被其他程序修改，请重新检测')
         self.original = list(self.ids)
+        self.undo_stack, self.redo_stack = [], []
         self.rules = load_rules(app.env)
         self.last_reasons = []
         self.drag_index = None
         self.window = tk.Toplevel(app.root)
         self.window.title("模组加载顺序")
         self.window.geometry("850x640")
+        self.window.minsize(850,560)
         self.window.configure(bg="#0b1422")
         self.window.transient(app.root)
         self.window.grab_set()
-        app.label(self.window, "已启用模组 · 实际加载顺序", font=("Microsoft YaHei UI", 17, "bold")).pack(
+        app.label(self.window, "模组配置草稿 · 应用后生效", font=("Microsoft YaHei UI", 17, "bold")).pack(
             anchor="w", padx=20, pady=(16, 7))
-        app.label(self.window, "拖动一行或用上下移按钮调整。核心内容包固定在最前面；同标识 Override 通常上方优先。保存后重启游戏生效。",
+        app.label(self.window, "拖动调整顺序；编辑草稿可添加或停用已安装模组，支持撤销和重做。统一应用前游戏配置不变，核心包保持原选择。",
                   fg="#8fa6bf", wraplength=800, justify="left").pack(anchor="w", padx=20)
         panel = tk.Frame(self.window, bg="#142237")
         panel.pack(fill="both", expand=True, padx=20, pady=12)
@@ -39,19 +46,34 @@ class OrderDialog:
         self.list.bind("<B1-Motion>", self.drag_move)
         self.list.bind("<ButtonRelease-1>", lambda event: setattr(self, "drag_index", None))
         self.note = app.locale.variable(app.root, value="自动排序依据资源依赖和前后规则，保留现有覆盖优先级；不按类型猜顺序。请核对作者说明，再保存。")
-        app.label(self.window, textvariable=self.note, fg="#8fa6bf", wraplength=800,
-                  justify="left", height=3, anchor="nw").pack(fill="x", padx=20)
+        note_label = app.label(self.window, textvariable=self.note, fg="#8fa6bf", wraplength=800,
+                               justify="left", height=3, anchor="nw")
+        note_label.pack(fill="x", padx=20)
         buttons = tk.Frame(self.window, bg="#0b1422")
         buttons.pack(fill="x", padx=20, pady=(8, 16))
         for title, command in [("自动排序", self.automatic), ("上移", lambda: self.move(-1)),
                                ("下移", lambda: self.move(1)), ("锁定/解锁", self.toggle_lock),
-                               ("前后规则", self.edit_rules), ("保存加载顺序", self.save)]:
-            app.button(buttons, title, command, primary=title.startswith("保存"), busy=False).pack(
+                               ("前后规则", self.edit_rules), ("应用草稿", self.save)]:
+            app.button(buttons, title, command, primary=title=="应用草稿", busy=False).pack(
                 side="left", padx=(0, 10))
         extra = tk.Frame(self.window, bg='#0b1422')
         extra.pack(fill='x', padx=20, pady=(0,10))
         for title,command in [('查看排序依据',self.explain),('导入排序规则',self.import_rules),('导出排序规则',self.export_rules)]:
             app.button(extra,title,command,busy=False).pack(side='left',padx=(0,10))
+        edit = tk.Menubutton(extra,text='编辑草稿 ▾',relief='flat',padx=12,pady=6)
+        menu = tk.Menu(edit,tearoff=False)
+        for title,command in [('添加已安装模组',self.add_installed),('停用选中模组',self.remove_selected),
+                              ('撤销',lambda:self.history(False)),('重做',lambda:self.history(True)),
+                              ('放弃草稿修改',self.reset_draft)]:
+            menu.add_command(label=title,command=command)
+        edit.configure(menu=menu); edit.pack(side='left')
+        # Reserve actions before assigning the remaining space to the list.
+        # Otherwise English at a larger font can push the draft menu offscreen.
+        extra.pack_configure(side='bottom',before=panel)
+        buttons.pack_configure(side='bottom',before=panel)
+        note_label.pack_configure(side='bottom',before=panel)
+        self.window.bind('<Control-z>',lambda event:self.history(False))
+        self.window.bind('<Control-y>',lambda event:self.history(True))
         self.window._language_refresh = lambda: self.render(self.list.curselection()[0] if self.list.curselection() else None)
         self.render()
         app.skin(self.window)
@@ -95,7 +117,60 @@ class OrderDialog:
         try: validate_order(candidate,self.original,self.rules)
         except Exception as error:
             self.note.set(str(error)); return False
-        self.ids=candidate; self.render(target); return True
+        self.remember(); self.ids=candidate; self.render(target); return True
+
+    def remember(self):
+        self.undo_stack.append(list(self.ids)); self.undo_stack=self.undo_stack[-50:]
+        self.redo_stack.clear()
+
+    def history(self, redo=False):
+        source,target = (self.redo_stack,self.undo_stack) if redo else (self.undo_stack,self.redo_stack)
+        if not source:return
+        try:validate_order(source[-1],self.original,self.rules)
+        except AssistantError as error:self.note.set(str(error));return
+        target.append(list(self.ids));self.ids=source.pop();self.render()
+        self.note.set('草稿已修改；游戏配置尚未改变。')
+
+    def reset_draft(self):
+        self.remember();self.ids=list(self.original);self.render()
+        self.note.set('已恢复打开窗口时的草稿；游戏配置尚未改变。')
+
+    def remove_selected(self):
+        selection=self.list.curselection()
+        if not selection:return
+        item=self.ids[selection[0]]
+        if item in self.rules['locks']:
+            self.note.set('此模组已锁定，请先解锁再停用。');return
+        candidate=[value for value in self.ids if value!=item]
+        try:validate_order(candidate,self.original,self.rules)
+        except AssistantError as error:self.note.set(str(error));return
+        self.remember();self.ids=candidate;self.render()
+        self.note.set('草稿已修改；游戏配置尚未改变。')
+
+    def add_installed(self):
+        from .core import load_package
+        candidates=[]
+        for item,data in self.app.mods.items():
+            path=installed_path(self.app.env,data['mod'])
+            if item in self.ids or path is None or not (path/'filelist.xml').is_file():continue
+            try:
+                if load_package(path).get('corepackage','false').casefold()!='true':candidates.append(item)
+            except (AssistantError,OSError):continue
+        if not candidates:
+            self.note.set('没有可添加的已安装普通模组；请先更新缺失模组。');return
+        window=tk.Toplevel(self.window);window.title('添加已安装模组');window.geometry('520x160')
+        window.transient(self.window);window.grab_set()
+        picker=ttk.Combobox(window,values=[self.app.mods[item]['mod'].name+' ['+item+']' for item in candidates],state='readonly',width=50)
+        picker.pack(padx=15,pady=20);picker.current(0)
+        def add():
+            candidate=self.ids+[candidates[picker.current()]]
+            try:validate_order(candidate,self.original,self.rules)
+            except AssistantError as error:self.note.set(str(error));return
+            self.remember();self.ids=candidate;self.render(len(self.ids)-1)
+            self.note.set('草稿已修改；游戏配置尚未改变。');close()
+        def close():window.destroy();self.window.grab_set()
+        self.app.button(window,'添加到草稿',add,busy=False).pack()
+        window.protocol('WM_DELETE_WINDOW',close);self.app.skin(window)
 
     def toggle_lock(self):
         selected=self.list.curselection()
@@ -103,7 +178,7 @@ class OrderDialog:
         item=self.ids[selected[0]]
         if item in self.rules['locks']: self.rules['locks'].remove(item)
         else:
-            if self.ids.index(item)!=self.original.index(item):
+            if item not in self.original or self.ids.index(item)!=self.original.index(item):
                 self.note.set('请先保存调整后的顺序，再锁定当前位置。'); return
             self.rules['locks'].append(item)
         save_rules(self.app.env,self.rules)
@@ -112,7 +187,8 @@ class OrderDialog:
     def edit_rules(self):
         window=tk.Toplevel(self.window); window.title('自定义前后规则'); window.geometry('740x490')
         window.configure(bg='#0b1422'); window.transient(self.window); window.grab_set()
-        names=[f"{self.app.mods[item]['mod'].name} [{item}]" for item in self.original]
+        rule_ids=list(self.ids)
+        names=[f"{self.app.mods[item]['mod'].name} [{item}]" for item in rule_ids]
         pending=[list(pair) for pair in self.rules['before']]
         self.app.label(window,'选择 A 和 B：A 必须排在 B 前面。相互矛盾的规则会阻止自动排序。',wraplength=700).pack(padx=15,pady=15)
         row=tk.Frame(window,bg='#0b1422'); row.pack(fill='x',padx=15)
@@ -130,14 +206,14 @@ class OrderDialog:
         def add():
             a,b=first.current(),second.current()
             if min(a,b)<0 or a==b: return
-            pair=[self.original[a],self.original[b]]
+            pair=[rule_ids[a],rule_ids[b]]
             if pair not in pending: pending.append(pair); refresh()
         def remove():
             if listing.curselection(): pending.pop(listing.curselection()[0]); refresh()
         def commit():
             try:
                 rules={'before':pending,'locks':list(self.rules['locks'])}
-                suggest_order(self.original,{item:data['mod'] for item,data in self.app.mods.items()},self.app.features,rules)
+                suggest_order(rule_ids,{item:data['mod'] for item,data in self.app.mods.items()},self.app.features,rules)
                 save_rules(self.app.env,rules); self.rules=rules
                 self.note.set('前后规则已保存。点击自动排序应用规则；保存顺序后游戏才会使用新顺序。')
                 window.destroy(); self.window.grab_set()
@@ -150,13 +226,12 @@ class OrderDialog:
 
     def automatic(self):
         try:
-            # Locks refer to the saved configuration; starting from it prevents
-            # an unsaved preview from moving a locked package indirectly.
-            baseline=self.original if self.rules['locks'] else self.ids
-            result = suggest_order(baseline, {item: data["mod"] for item, data in self.app.mods.items()},
+            # Draft operations already validate saved lock positions. Keep added
+            # and disabled entries when generating a suggestion for this draft.
+            result = suggest_order(self.ids, {item: data["mod"] for item, data in self.app.mods.items()},
                                    self.app.features,self.rules)
             validate_order(result.ids,self.original,self.rules)
-            self.ids = result.ids
+            self.remember(); self.ids = result.ids
             self.last_reasons = result.reasons
             self.note.set("；".join(result.reasons[:2]) + "。全部依据已记入主窗口日志，可继续拖动调整。")
             for reason in result.reasons:
@@ -200,8 +275,10 @@ class OrderDialog:
 
     def save(self):
         ids = list(self.ids)
+        if not self.app.dialogs.askyesno('应用模组草稿',
+                '将保存草稿中的启用列表和加载顺序，并备份原配置。核心内容包保持当前选择。是否应用？',parent=self.window):return
         def commit():
-            backup = save_order(self.app.env, ids)
-            self.app.events.put({"kind": "order_saved", "ids": ids, "backup": backup})
+            backup = commit_draft(self.app.env,ids,self.baseline,self.original,[d['mod'] for d in self.app.mods.values()])
+            self.app.events.put({"kind": "order_saved", "ids": ids, "backup": backup, 'draft':True})
         self.window.destroy()
         self.app.work(commit)

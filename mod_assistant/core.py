@@ -217,12 +217,18 @@ class Environment:
                 return candidate
         return None
 
-    def record(self, item_id: str) -> dict:
+    def workshop_manifests(self):
+        manifests = []
         for library in self.libraries:
             path = library / "steamapps" / "workshop" / f"appworkshop_{APP_ID}.acf"
             if not path.is_file():
                 continue
             data = read_vdf(path).get("AppWorkshop", {})
+            manifests.append(data)
+        return manifests
+
+    def record(self, item_id: str, manifests=None) -> dict:
+        for data in self.workshop_manifests() if manifests is None else manifests:
             installed = data.get("WorkshopItemsInstalled", {}).get(item_id)
             details = data.get("WorkshopItemDetails", {}).get(item_id, {})
             if installed:
@@ -342,10 +348,11 @@ class Mod:
     claimed_hash: str = ""
 
 
-def inventory(env: Environment) -> list[Mod]:
+def inventory(env: Environment, read_config=True) -> list[Mod]:
     # Import here to keep the read-only discovery module separate from config edits.
     from .mod_toggle import enabled_ids
-    enabled = enabled_ids(env)
+    enabled = enabled_ids(env) if read_config else set()
+    manifests = env.workshop_manifests()
     ids = set()
     for library in env.libraries:
         folder = library / "steamapps" / "workshop" / "content" / str(APP_ID)
@@ -363,7 +370,7 @@ def inventory(env: Environment) -> list[Mod]:
             mod.mod_version = root.get("modversion", "")
             mod.game_version = root.get("gameversion", "")
             mod.claimed_hash = root.get("expectedhash", "")
-            record = env.record(item_id)
+            record = env.record(item_id, manifests)
             mod.size = record.get("size", 0)
             target = env.installed / item_id
             if target.is_dir():
@@ -400,7 +407,7 @@ def inventory(env: Environment) -> list[Mod]:
                     mod.status = f"需要检查：{error}"
                 mods.append(mod)
     from .mod_order import read_order
-    order = {item: index for index, item in enumerate(read_order(env, strict=False))}
+    order = {item: index for index, item in enumerate(read_order(env, strict=False))} if read_config else {}
     return sorted(mods, key=lambda m: (not m.enabled,
                                       order.get(m.item_id, -1 if m.enabled else len(order)),
                                       m.name.lower()))

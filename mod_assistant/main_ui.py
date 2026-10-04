@@ -109,7 +109,7 @@ class MainInterface:
         menu_button=tk.Menubutton(actions,text='更多操作 ▾',bg='#20354e',fg=TEXT,relief='flat',
                                   padx=12,pady=6,font=('Microsoft YaHei UI',10))
         menu=tk.Menu(menu_button,tearoff=False)
-        for title,command in [('重试失败项',app.retry_failed),('恢复选中模组上一版',app.restore),
+        for title,command in [('继续未完成更新',app.resume_update),('重试失败项',app.retry_failed),('恢复选中模组上一版',app.restore),
                               ('查看完整分析',app.show_full_analysis),('导出兼容分析',app.export_analysis),
                               ('导出联机清单',app.export_profile),('对比联机清单',app.compare_profile),
                               ('导出更新报告',app.export_report)]: menu.add_command(label=title,command=command)
@@ -158,9 +158,10 @@ class MainInterface:
         app.tree.configure(xscrollcommand=horizontal.set,yscrollcommand=bar.set)
         app.tree.bind('<Button-1>',app.click_checkbox); app.tree.bind('<space>',app.toggle_highlight)
         app.tree.bind('<<TreeviewSelect>>',app.show_detail)
+        app.tree.bind('<Control-c>',app.copy_selected)
         app.tree.bind('<Button-3>',self.context_menu)
         self.context=tk.Menu(app.tree,tearoff=False)
-        for title,command in [('启用 / 禁用选中模组',app.toggle_selected),('查看完整分析',app.show_full_analysis),
+        for title,command in [('复制名称与编号',app.copy_selected),('启用 / 禁用选中模组',app.toggle_selected),('查看完整分析',app.show_full_analysis),
                               ('调整加载顺序',app.show_order)]: self.context.add_command(label=title,command=command)
 
     def build_tools(self):

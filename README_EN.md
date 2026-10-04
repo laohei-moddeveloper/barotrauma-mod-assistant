@@ -1,6 +1,6 @@
 # BaroDock | Barotrauma Mod Manager
 
-Version **0.7.1** is a standalone mod manager for the Steam version of Barotrauma on **64-bit Windows**, with **English and Simplified Chinese** interfaces.
+Version **0.8.0** is a standalone mod manager for the Steam version of Barotrauma on **64-bit Windows**, with **English and Simplified Chinese** interfaces.
 
 [Download](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/latest) · [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3812360206&l=english) · [中文说明](使用说明.md)
 
@@ -25,7 +25,7 @@ Use the **中文 / English** selector at the top of the window. Language changes
 1. Keep Steam signed in. Close the game and dedicated server before changing files, enabled mods, profiles, order, or LuaCs.
 2. Wait for scanning. **Update** selects a mod for the task; **Enabled** controls whether the game loads it next time. These are separate choices.
 3. Click **Update mods**. Defaults: 4 concurrent Workshop requests and 3 installations. Adjust these in **Settings & appearance**.
-4. Open **Load order** for drag-and-drop, **Auto-sort**, before/after rules, and locked positions. Click **Save load order** to apply it on the next game launch.
+4. Open **Load order** for drag-and-drop, **Auto-sort**, before/after rules, and locked positions. Click **Apply draft** to apply it on the next game launch.
 5. Click **Launch game** when finished.
 
 Use **Mods** for filtering, search, enabled state, order, and profiles. Use **Tools & scripts** for LuaCs, logs, cache installation, and exports. **Settings & appearance** has themes, colors, font size, list spacing, and update settings.
@@ -67,3 +67,15 @@ Python 3.12; runtime uses the standard library. Run `python -m unittest discover
 Startup and Refresh inspect local files. Choose **Online inspection** for Steam download status and public metadata; updates explain access before connecting. No process enumeration or automatic subscription changes. See [Access & privacy](ACCESS_AND_PRIVACY.md), also included in the release. This ordinary desktop application is not an OS sandbox.
 
 Auto-sort uses identified resource dependencies, explicit rules and existing overlapping-definition precedence, without guessing from mod categories/names. View all reasons, import/export local JSON rules and review before saving. Import alone does not change game order. Inspired by RimPy's rule-based approach, without copying RimWorld-specific order rules.
+
+## 0.8.0: earlier browsing, resumable tasks and a configuration draft
+
+The local list appears before deeper analysis, with types filled in as each mod finishes. Workshop manifests are read once per library; indexed comparisons skip unrelated pairs while retaining conflict evidence. Without a valid game configuration, local mods remain browsable with Enabled shown as Unknown and editing disabled. Open the game to its main menu and exit once, then Refresh.
+
+Update tasks store only the latest targets, completed IDs and online choice locally. After interruption, use **More actions → Resume unfinished updates** to explicitly continue unfinished items. Online tasks explain access again. There is no automatic background download; Steam may continue downloads it already accepted. Starting a different task warns before replacing the previous record.
+
+In **Load order → Edit draft**, add installed regular mods, disable selected entries, undo/redo or reset. Ctrl+Z / Ctrl+Y undo and redo list edits, including moves and auto-sort. **Apply draft** confirms, backs up configuration and saves the enabled list/order together. Closing discards the list draft; rules/locks are saved separately. If the game starts or another program changes configuration, applying is blocked. This does not change the core package, download missing mods or change subscriptions.
+
+Search accepts separate words: `Demo Pack` matches `Demo Equipment Expansion Pack`; every word must match the name, ID or type. Ctrl+C in the mod list or the context menu copies selected names/IDs without reading the clipboard. **No direct conflict found · Needs testing** means no static overlap was found, not proven compatibility. Affliction Overrides do not receive a predicted winner based only on list position.
+
+See [Community feedback and design decisions](docs/community-feedback.md) for sources and remaining work. Runtime dependencies remain the Python standard library; the released EXE includes its runtime.

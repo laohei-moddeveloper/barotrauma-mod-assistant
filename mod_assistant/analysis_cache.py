@@ -1,5 +1,5 @@
 """Incremental analysis; running-game scans never walk resource trees."""
-from dataclasses import asdict, fields
+from dataclasses import asdict, fields, replace
 import hashlib
 import json
 from pathlib import Path
@@ -59,12 +59,15 @@ def signature(mod, metadata, cancel=None):
     value = [str(mod.source),mod.name,sorted(rows,key=lambda row:Path(row[0])),metadata]
     return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
-def inspect_cached(env, mods, metadata=None, light=False, force=False, cancel=None, emit=lambda message: None):
+def inspect_cached(env, mods, metadata=None, light=False, force=False, cancel=None, emit=lambda message: None,
+                   on_feature=lambda item, feature: None):
     metadata = metadata or {}
     folder = env.work / 'analysis/features-v2'
     results = {}; stats = {'reused':0,'scanned':0,'deferred':0}
     for mod in mods:
         if cancel and cancel.is_set(): raise Cancelled('分析已停止')
+        if mod.item_id.isdecimal() and (env.installed/mod.item_id/'filelist.xml').is_file():
+            mod = replace(mod, source=env.installed/mod.item_id)
         entry = metadata.get(mod.item_id,{})
         path = folder / (hashlib.sha256(mod.item_id.encode()).hexdigest()+'.json')
         cached = None
@@ -99,4 +102,5 @@ def inspect_cached(env, mods, metadata=None, light=False, force=False, cancel=No
                 except OSError:
                     emit('分析缓存无法保存；本次分析结果仍可使用，下次可能重新分析。')
         results[mod.item_id] = feature
+        on_feature(mod.item_id, feature)
     return results, stats

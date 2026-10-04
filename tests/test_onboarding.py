@@ -235,7 +235,10 @@ class OnboardingUiTests(test_ui.UiTests):
             app.scan();app.worker.join(3)
             self.assertFalse(app.worker.is_alive());app.drain()
         bridge.assert_not_called()
-        self.assertIn('主菜单',dialog.call_args.args[1])
+        dialog.assert_not_called()
+        self.assertFalse(app.config_ready)
+        self.assertIn('主菜单',app.logs.get('1.0','end'))
+        self.assertTrue(app.mods)
         self.assertEqual(app.update_button.cget('state'),'disabled')
 
     def test_empty_new_user_inventory_is_successful_offline(self):

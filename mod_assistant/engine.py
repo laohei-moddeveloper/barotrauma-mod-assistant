@@ -7,6 +7,7 @@ import threading
 import time
 from .core import AssistantError, Cancelled, Environment, Installer, atomic_json, game_running, scoped_game_guard
 from .steam import DOWNLOADING, PENDING, SUBSCRIBED, SteamBridge, result_text
+from .tasks import TaskCheckpoint
 
 
 class UpdateEngine:
@@ -31,8 +32,11 @@ class UpdateEngine:
         if self.process_guard():
             raise AssistantError("请先关闭《潜渊症》和服务器，再更新模组")
         ids = list(dict.fromkeys(ids))
-        if any(not item.isdecimal() for item in ids):
+        if len(ids) > 2000 or any(not isinstance(item,str) or not item.isascii() or not item.isdecimal()
+                                or len(item)>20 or not 0<int(item)<2**64 for item in ids):
             raise AssistantError("模组编号格式无效")
+        checkpoint = TaskCheckpoint(self.env)
+        checkpoint.begin(ids, online)
         bridge = None
         results, errors = {}, {}
         started = time.monotonic()
@@ -84,7 +88,8 @@ class UpdateEngine:
                                 self.event(item, "失败", detail=errors[item])
                             else:
                                 active[item] = {"last_progress": now, "started": now,
-                                                "bytes": -1, "attempt": 0, "retry_at": 0}
+                                                "bytes": -1, "attempt": 0, "retry_at": 0,
+                                                "sample_at":now, "sample_bytes":0, "speed":0.0}
                                 self.event(item, "已提交 / 等待 Steam")
                         elif cache_ready(item):
                             install_pending.append(item)
@@ -131,9 +136,17 @@ class UpdateEngine:
                                 state["bytes"] = done
                                 state["last_progress"] = now
                             native_state = bridge.state(item)
+                            interval = now - state['sample_at']
+                            if interval >= 1:
+                                state['speed'] = max(0, done-state['sample_bytes']) / interval
+                                state['sample_at'], state['sample_bytes'] = now, done
                             label = "下载中" if native_state & DOWNLOADING else "Steam 排队 / 等待完成"
+                            detail = (f"{done / 1048576:.1f} / {total / 1048576:.1f} MB" if total else "Steam 尚未提供下载大小")
+                            if native_state & DOWNLOADING and state['speed'] > 0:
+                                detail += f" · {state['speed']/1048576:.2f} MB/s"
+                            detail += f" · 等待/下载 {now-state['started']:.0f} 秒"
                             self.event(item, label, done / total * 100 if total else 0,
-                                       f"{done / 1048576:.1f} / {total / 1048576:.1f} MB" if total else "")
+                                       detail)
                             if now - state["last_progress"] > self.stall_timeout or now - state["started"] > 1800:
                                 # Do not delete or resubmit a still active native download.
                                 if native_state & (DOWNLOADING | PENDING):
@@ -172,7 +185,9 @@ class UpdateEngine:
                         if future.done():
                             item = futures.pop(future)
                             try:
-                                results[item] = asdict(future.result())
+                                result = asdict(future.result())
+                                checkpoint.complete(item)
+                                results[item] = result
                                 self.event(item, "已完成", 100,
                                            "文件状态未变化，沿用上次完整校验的安装" if results[item].get("unchanged") else
                                            f'复制 {results[item]["copied"]} 个，复用 {results[item]["reused"]} 个文件')
@@ -189,6 +204,7 @@ class UpdateEngine:
                        "download_slots": self.download_slots, "install_slots": self.install_slots,
                        "online": online}
             atomic_json(self.env.work / "last-run.json", summary)
+            checkpoint.finish('cancelled' if self.cancel.is_set() else 'partial' if errors else 'complete')
             return summary
         finally:
             if bridge:
