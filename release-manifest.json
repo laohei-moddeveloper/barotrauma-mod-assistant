@@ -1,11 +1,11 @@
 {
-  "version": "0.8.0",
+  "version": "0.8.1",
   "platform": "Windows x64",
   "languages": [
     "zh",
     "en"
   ],
-  "unit_tests_passed": 155,
+  "unit_tests_passed": 156,
   "packaged_self_check": true,
   "historical_binary_rebuilt": false,
   "validation": {
@@ -19,16 +19,24 @@
       "graphite",
       "daylight"
     ],
-    "packaged_self_check_seconds": 13.032,
+    "packaged_self_check_seconds": 19.219,
     "local_scan_timings_seconds": {
-      "first_list_seconds": 0.15600000000085856,
-      "complete_seconds": 12.140999999999622
+      "first_list_seconds": 0.31199999999989814,
+      "complete_seconds": 17.796000000000276
     },
     "community_feedback_reviewed": true,
+    "dropdown_checks": [
+      "zh:ocean",
+      "zh:graphite",
+      "zh:daylight",
+      "en:ocean",
+      "en:graphite",
+      "en:daylight"
+    ],
     "clean_windows_ci": {
       "passed": true,
-      "url": "https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/actions/runs/37179369061",
-      "source_commit": "497f1c36714819b8eff012358d81c0e3632c72f9"
+      "url": "https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/actions/runs/37183002918",
+      "source_commit": "ed4b8fdfc7e4566956de904bcff7dbf8d409d865"
     },
     "resumable_queue_and_draft_checks": true,
     "synthetic_local_benchmark": {
@@ -45,6 +53,7 @@
         "results_equivalent": true
       }
     },
+    "layout_and_benchmark_reference_version": "0.8.0",
     "small_window_large_font_checked": true,
     "first_use_and_recovery_checks": true,
     "default_scan_no_network_checked": true,
@@ -54,26 +63,26 @@
   },
   "executable": {
     "name": "BarotraumaModAssistant.exe",
-    "bytes": 13458216,
-    "sha256": "23a132af99271c1fb181d083a36343409d78c4e455c803b7ee58326c732d87d1"
+    "bytes": 13459076,
+    "sha256": "4ddccec57d8781d1221bca5f2ec3f4d6c5fbe6eac3aadf2825fe1a1eacb4af9e"
   },
   "archive": {
-    "name": "BarotraumaModAssistant-v0.8.0-win64.zip",
-    "bytes": 13192400,
-    "sha256": "495b3b34df9142ed02ace9c24d82b751ce4140e93efe00593378cec97de40cae"
+    "name": "BarotraumaModAssistant-v0.8.1-win64.zip",
+    "bytes": 13192976,
+    "sha256": "83e52d02b58999f152cadb0cfad54ac22f7166737dfdbeee0d714156fbe8e847"
   },
   "sources": {
-    "mod_assistant/__init__.py": "174334b5a99773f1f8cf4f0a5a090f7f90bd9a6a5a4d138ec8d870efd8cc18b8",
+    "mod_assistant/__init__.py": "b9b913640b7f3b67d61335771706b537a0c3c97915e2af67dd7171de06d1cd5b",
     "mod_assistant/access.py": "d86b617db47803d4816b1b47cc574dbd7ef55fb5204796dd66175fb033689058",
     "mod_assistant/analysis_cache.py": "2e7d5e82a34c48615d0634eaf886e6674d3e0e4041f8c1f4c26fb1c1f42c9c6b",
-    "mod_assistant/app.py": "152b29bf3a599070116040516b586ee5fb92620bee251e444674d5cf134afd5e",
+    "mod_assistant/app.py": "c483d851534f57e5d0cb0faf3f63399dd4a938a74e2833c6ecb61ebaa609766a",
     "mod_assistant/appearance.py": "aeccc7ee8e7f1f8a55433d5809efb0dc7ea5e720985b383a3ce2c2b3e3a4b2d4",
     "mod_assistant/core.py": "f3fa227d306ed300996bdd1926a4e54efa6319e721d7394484165ea54d5b9b76",
     "mod_assistant/diagnostics.py": "747968c2800f33aa3580a77e2a368069034295cbf39ca00f8f9b94981624fbf2",
     "mod_assistant/drafts.py": "b179290d1cc79b99db2fa1e303347b5ef85911155ddfd5cbd2843ff29688d419",
     "mod_assistant/engine.py": "b2f4740f0e8f98f569d15394b340ce3a9f39e913c2b224093c0fd427a69ee1b7",
     "mod_assistant/friends.py": "ae06a1ef354b7ba23fdcfa4a31185990941043496e239d5d378e6f6b0c5606d6",
-    "mod_assistant/i18n.py": "3bdbf6fe5791a971d7e6ab67531618e3f65d5bf3c5943bfc961aabb0a83603a6",
+    "mod_assistant/i18n.py": "aea1449be4aa3891ca175dfa4beeb2809094f64e7d0346e2b7a0e58ffbab0694",
     "mod_assistant/i18n_catalog.py": "b52c52ac6c8bf3b0576b3c719d397fe89a41c5aebc26c8df7311e50499254c8b",
     "mod_assistant/luacs.py": "2c6c3074fd57616ec5fa965af2b81977124667fd2f9dc8f7dbd16fad4faee9c8",
     "mod_assistant/main_ui.py": "e78c86af3e362134b9a6b726580d7351ab042a4d843a259db67cd66338239668",
