@@ -3,7 +3,7 @@
   "id": "3812360206",
   "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=3812360206",
   "title": "BaroDock｜潜渊症模组管理",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "visibility": "public",
   "upload_confirmed": true,
   "legal_acceptance_required": false,
@@ -16,7 +16,7 @@
     "zh",
     "en"
   ],
-  "executable_sha256": "5a1c9874f82c929dc2718f961d58de4ba02ec41e6c32c2f1ebfdd309c257fa91",
+  "executable_sha256": "23a132af99271c1fb181d083a36343409d78c4e455c803b7ee58326c732d87d1",
   "cover": {
     "file": "cover-en.gif",
     "language": "english",
