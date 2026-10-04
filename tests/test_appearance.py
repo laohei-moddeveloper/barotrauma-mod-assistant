@@ -1,5 +1,6 @@
 import json
 import tkinter as tk
+from tkinter import ttk
 import unittest
 
 from mod_assistant.appearance import DEFAULTS, PALETTES, THEMES, contrast, normalize, palette
@@ -39,6 +40,38 @@ class AppearanceUiTests(test_ui.UiTests):
     test_drag_preview_respects_lock_and_never_writes_live_order=None
     test_manager_callback_and_operation_result_are_handled=None
     test_rule_editor_and_luacs_report_open=None
+
+    def test_dropdown_selection_localizes_from_tcl_scope_and_preserves_game_config(self):
+        app=self.app; before=self.config.read_bytes(); errors=[]
+        self.root.report_callback_exception=lambda *error:errors.append(str(error[1]))
+        def children(widget):
+            for child in widget.winfo_children():
+                yield child
+                yield from children(child)
+        def select(variable,index):
+            picker=next(widget for widget in children(self.root)
+                        if isinstance(widget,ttk.Combobox)
+                        and str(widget.cget('textvariable'))==str(variable))
+            # This is the same Tcl procedure used by the real dropdown, where
+            # an unqualified getvar() resolves in Tcl's local callback scope.
+            self.root.tk.call('ttk::combobox::SelectEntry',str(picker),index)
+            self.root.update_idletasks()
+        for language in ('en','zh'):
+            app.set_language(language,persist=False)
+            for index,theme in enumerate(THEMES):
+                select(app.interface.theme,index)
+                self.assertEqual(errors,[])
+                self.assertEqual(app.appearance.prefs['theme'],theme)
+                self.assertEqual(self.root.tk.globalgetvar(str(app.interface.language)),
+                                 'English' if language=='en' else '中文')
+            select(app.interface.font,2);select(app.interface.density,1)
+            self.assertEqual(errors,[])
+            self.assertEqual(app.appearance.prefs['font_size'],12)
+            self.assertEqual(app.appearance.prefs['density'],'compact')
+            self.assertEqual(self.config.read_bytes(),before)
+            saved=json.loads(app.settings_file.read_text(encoding='utf-8'))
+            self.assertEqual(saved['appearance']['theme'],'daylight')
+            self.assertEqual(saved['appearance']['font_size'],12)
 
     def test_theme_updates_existing_dialogs_and_preserves_selection_and_game_configuration(self):
         app=self.app; before=self.config.read_bytes(); app.tree.selection_set('101'); app.selected={'101'}

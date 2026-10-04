@@ -1,14 +1,14 @@
 [b]Source & downloads:[/b] [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant]Public GitHub repository[/url] · [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/latest]Latest release & checksums[/url]
 
-[h1]BaroDock — a little less setup before the next dive[/h1]
-I built this tool to make updates, load orders and shared setups easier. Your computers and mods may reveal problems I missed. Questions, criticism and small usability suggestions are welcome. Thank you for helping improve it.
+[h1]BaroDock | Barotrauma Mod Manager[/h1]
+Update mods, organise load order and save setups. Chinese / English UI, sorting explanations, static compatibility warnings and optional LuaCs / C# installation.
 
-[b]Standalone Windows 64-bit application, not an in-game mod.[/b] Subscribe to get the files, then run a separate copy. Do not enable this package in the game or require it on a server. BaroDock itself needs no Python, LuaCs or C# setup.
+[b]Windows 64-bit standalone tool. No Python or LuaCs required for BaroDock itself. Run a separate copy; do not enable this package in-game or require it on a server.[/b]
+[b]Start here:[/b] Subscribe → wait for download → run Install-to-desktop.cmd → close the game and open BaroDock. Folder paths are in Getting started below; GitHub downloads are above.
+[b]Access at a glance:[/b] local file inspection by default. You confirm online actions and LuaCs installation. No system-wide process enumeration, telemetry or administrator elevation request. [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/ACCESS_AND_PRIVACY.md]Access purposes and limitations[/url]
 
-[h1]0.8.0: smoother everyday management[/h1]
-Browse the local list before deeper analysis. Without a valid game configuration, browse in read-only mode. Use More actions → Resume unfinished updates to explicitly continue remaining items after interruption; no automatic network restart.
-Load order → Edit draft adds installed regular mods, disables selected entries and supports undo/redo (Ctrl+Z / Ctrl+Y). Apply draft confirms, backs up and saves once; game activity or changed configuration blocks applying. Rules/locks are saved separately.
-Multiword search and Ctrl+C copy names/IDs. No direct conflict found still needs testing; affliction Overrides do not infer a winner from position alone. No new runtime dependencies. See [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/docs/community-feedback.md]community feedback and decisions[/url].
+[h1]0.8.1: dropdown fix[/h1]
+Theme, font and density selections now work correctly from their dropdowns. Includes a check using the actual dropdown callback in Chinese and English. [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/tag/v0.8.1]Release notes[/url]
 
 [h1]0.7.0: changes following community feedback[/h1]
 The earlier process checks were broader than necessary. This version removes system-wide process enumeration and automatic subscription calls. Startup and Refresh now inspect local files. Online actions and LuaCs installation explain access before you proceed. Thank you to the players who raised these concerns.
@@ -53,6 +53,6 @@ The desktop copy is stored in [code]%LOCALAPPDATA%\BarotraumaModAssistant\Worksh
 Please comment here or use [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/issues]GitHub Issues[/url]. Tell me what you wanted to do and what got in the way; no coding knowledge needed. I cannot promise immediate replies or every feature. Confirmed changes will be documented.
 For bugs, share the version, steps and error text. Remove personal information from reports/logs; never send passwords, verification codes or credentials.
 
-[b]Current version: 0.8.0.[/b] 155 unit/isolated checks and packaged bilingual UI checks do not cover every computer, mod combination or real multiplayer session. Guides, access notes and SHA-256 checksums are included. No base-game files, third-party mods or personal setups are distributed. Unofficial community project.
+[b]Current version: 0.8.1.[/b] 156 unit/isolated checks and packaged bilingual UI checks do not cover every computer, mod combination or real multiplayer session. Guides, access notes and SHA-256 checksums are included. No base-game files, third-party mods or personal setups are distributed. Unofficial community project.
 
 [b]AI assistance:[/b] Used during development and for earlier covers. The current geometric cover was built from code.

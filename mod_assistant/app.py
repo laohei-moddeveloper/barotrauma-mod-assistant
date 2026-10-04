@@ -1036,6 +1036,7 @@ def self_check(report_path):
         if app.env is not None and not (app.worker and app.worker.is_alive()):
             appearance_checks = []
             language_checks = []
+            dropdown_checks = []
             try:
                 assert len(app.interface.notebook.tabs()) == 3
                 assert len(app.tree.get_children()) == len(app.mods)
@@ -1076,6 +1077,27 @@ def self_check(report_path):
                         assert manager.profile_preview.cget('foreground') == app.appearance.colours['muted']
                         assert app.tree['displaycolumns'][:3] == ('check','enable','name')
                         appearance_checks.append(theme)
+                    def widgets(parent):
+                        for child in parent.winfo_children():
+                            yield child
+                            yield from widgets(child)
+                    theme_picker=next(widget for widget in widgets(root)
+                                      if isinstance(widget,ttk.Combobox)
+                                      and str(widget.cget('textvariable'))==str(app.interface.theme))
+                    original_apply=app.interface.apply
+                    # Exercise actual dropdown callbacks without persisting
+                    # diagnostic appearance choices into the user's settings.
+                    app.interface.apply=lambda prefs,persist=True:original_apply(prefs,persist=False)
+                    try:
+                        for language in ('zh','en'):
+                            app.set_language(language,persist=False)
+                            for index,theme in enumerate(('ocean','graphite','daylight')):
+                                root.tk.call('ttk::combobox::SelectEntry',str(theme_picker),index)
+                                assert not errors
+                                assert app.appearance.prefs['theme']==theme
+                                dropdown_checks.append(language+':'+theme)
+                    finally:
+                        app.interface.apply=original_apply
                 finally:
                     app.set_language(original_language,persist=False)
                     app.interface.apply(original,persist=False)
@@ -1091,6 +1113,7 @@ def self_check(report_path):
                         'analysis_cache':app.analysis_stats,
                         'appearance_checks':appearance_checks,
                         'language_checks':language_checks,
+                        'dropdown_checks':dropdown_checks,
                         "load_order": read_order(app.env, strict=False),
                         "luacs": asdict(luacs_status(app.env)),
                         "enabled": sum(data["mod"].enabled for data in app.mods.values()),

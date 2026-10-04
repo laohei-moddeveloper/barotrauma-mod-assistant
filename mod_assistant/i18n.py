@@ -211,7 +211,9 @@ class Localizer:
                     if self.language=='en' and column in minimums:
                         minimum=int(minimums[column]*max(1,size/10))
                         widget.column(column,minwidth=minimum,width=max(minimum,widget.column(column,'width')))
-            if isinstance(widget, ttk.Combobox) and isinstance(widget.getvar(widget.cget('textvariable')) if widget.cget('textvariable') else '', str):
+            # Dropdown selections run inside a Tcl procedure. Tk variables live
+            # in global scope; getvar() would search the procedure's local scope.
+            if isinstance(widget, ttk.Combobox) and isinstance(widget.tk.globalgetvar(widget.cget('textvariable')) if widget.cget('textvariable') else '', str):
                 values = tuple(widget['values'])
                 previous = getattr(widget, '_language_values', None)
                 if previous is None or values != previous[1]:
