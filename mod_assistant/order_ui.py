@@ -1,8 +1,11 @@
 """A draggable preview of the actual enabled regular-package order."""
 import tkinter as tk
+import json
+from pathlib import Path
 from tkinter import messagebox, ttk
 
-from .mod_order import read_order, save_order, suggest_order, load_rules, save_rules, validate_order
+from .mod_order import read_order, save_order, suggest_order, load_rules, save_rules, validate_order, check_rules
+from .core import atomic_json, AssistantError
 
 
 class OrderDialog:
@@ -11,6 +14,7 @@ class OrderDialog:
         self.ids = read_order(app.env)
         self.original = list(self.ids)
         self.rules = load_rules(app.env)
+        self.last_reasons = []
         self.drag_index = None
         self.window = tk.Toplevel(app.root)
         self.window.title("模组加载顺序")
@@ -34,7 +38,7 @@ class OrderDialog:
         self.list.bind("<ButtonPress-1>", self.drag_start)
         self.list.bind("<B1-Motion>", self.drag_move)
         self.list.bind("<ButtonRelease-1>", lambda event: setattr(self, "drag_index", None))
-        self.note = app.locale.variable(app.root, value="自动排序考虑资源依赖，保留重复定义的现有覆盖顺序，再建议框架、汉化、补丁、内容分组。请优先遵循作者说明。")
+        self.note = app.locale.variable(app.root, value="自动排序依据资源依赖和前后规则，保留现有覆盖优先级；不按类型猜顺序。请核对作者说明，再保存。")
         app.label(self.window, textvariable=self.note, fg="#8fa6bf", wraplength=800,
                   justify="left", height=3, anchor="nw").pack(fill="x", padx=20)
         buttons = tk.Frame(self.window, bg="#0b1422")
@@ -44,6 +48,10 @@ class OrderDialog:
                                ("前后规则", self.edit_rules), ("保存加载顺序", self.save)]:
             app.button(buttons, title, command, primary=title.startswith("保存"), busy=False).pack(
                 side="left", padx=(0, 10))
+        extra = tk.Frame(self.window, bg='#0b1422')
+        extra.pack(fill='x', padx=20, pady=(0,10))
+        for title,command in [('查看排序依据',self.explain),('导入排序规则',self.import_rules),('导出排序规则',self.export_rules)]:
+            app.button(extra,title,command,busy=False).pack(side='left',padx=(0,10))
         self.window._language_refresh = lambda: self.render(self.list.curselection()[0] if self.list.curselection() else None)
         self.render()
         app.skin(self.window)
@@ -149,12 +157,46 @@ class OrderDialog:
                                    self.app.features,self.rules)
             validate_order(result.ids,self.original,self.rules)
             self.ids = result.ids
+            self.last_reasons = result.reasons
             self.note.set("；".join(result.reasons[:2]) + "。全部依据已记入主窗口日志，可继续拖动调整。")
             for reason in result.reasons:
                 self.app.log("排序建议：" + reason)
             self.render()
         except Exception as error:
             self.app.dialogs.showerror("无法自动排序", str(error), parent=self.window)
+
+    def explain(self):
+        names=lambda ids: '\n'.join(f'{number}. {self.app.mods[item]["mod"].name} [{item}]' for number,item in enumerate(ids,1))
+        text='\n\n'.join(['已保存的顺序',names(self.original),'当前预览（尚未保存）',names(self.ids),
+                         '排序依据', '\n'.join(self.last_reasons) or '尚未生成自动排序建议。',
+                         '规则只描述模组之间的顺序，不执行代码；导入和导出均为本地文件，不自动上传。'])
+        self.app.text_report('排序预览与依据',text)
+
+    def import_rules(self):
+        path=self.app.files.askopenfilename(title='导入排序规则',filetypes=[('JSON','*.json')],parent=self.window)
+        if not path:return
+        try:
+            if Path(path).stat().st_size>256*1024:raise AssistantError('排序规则文件过大')
+            data=json.loads(Path(path).read_text(encoding='utf-8-sig'))
+            if data.get('schema')!='baropy-order-rules-v1':raise AssistantError('排序规则格式不受支持')
+            rules=check_rules(data)
+            result=suggest_order(self.original,{item:d['mod'] for item,d in self.app.mods.items()},self.app.features,rules)
+            detail=f'将替换本地规则：{len(rules["before"])} 条前后规则，{len(rules["locks"])} 个锁定。导入不会修改游戏顺序；请预览后另行保存。'
+            if not self.app.dialogs.askyesno('确认导入排序规则',detail,parent=self.window):return
+            save_rules(self.app.env,rules)
+            self.rules=rules; self.last_reasons=result.reasons
+            self.note.set('规则已导入；请查看排序依据，生成预览后再保存顺序。')
+            self.render()
+        except (OSError,ValueError,TypeError,AttributeError,AssistantError) as error:
+            self.app.dialogs.showerror('规则无法应用',str(error),parent=self.window)
+
+    def export_rules(self):
+        path=self.app.files.asksaveasfilename(title='导出排序规则',defaultextension='.json',initialfile='BaroPy-order-rules.json',parent=self.window)
+        if not path:return
+        try:
+            atomic_json(Path(path),{'schema':'baropy-order-rules-v1',**check_rules(self.rules)})
+        except OSError as error:
+            self.app.dialogs.showerror('规则无法应用',str(error),parent=self.window)
 
     def save(self):
         ids = list(self.ids)

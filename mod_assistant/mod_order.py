@@ -11,7 +11,7 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 
-from .core import AssistantError, Environment, Mod, atomic_json, game_running
+from .core import AssistantError, Environment, Mod, atomic_json, game_running, scoped_game_guard
 from .mod_analysis import Features
 from .mod_toggle import BLOCK, configured_key
 
@@ -129,37 +129,31 @@ def suggest_order(ids: list[str], mods: dict[str, Mod], features: dict[str, Feat
             for later in ids[position+1:]: edge(item,later)
             reasons.append('保留锁定位置：'+mods[item].name)
 
-    def rank(item: str) -> int:
-        kinds = set(features.get(item, Features(item, mods[item].name)).kinds)
-        if "框架/脚本" in kinds or mods[item].name.casefold().startswith("luacs"):
-            return 0
-        if "语言/文本" in kinds:
-            return 1
-        if "补丁/调整" in kinds:
-            return 2
-        return 3
-
     position = {item: index for index, item in enumerate(ids)}
-    ready = [(rank(item), position[item], item) for item in ids if incoming[item] == 0]
+    # A category/name is not evidence of a load-order relationship. Retain the
+    # user's relative order unless resource dependencies or reviewed rules
+    # require moving entries. Do not import RimWorld's precedence semantics.
+    ready = [(position[item], item) for item in ids if incoming[item] == 0]
     heapq.heapify(ready)
     proposed = []
     while ready:
-        _, _, item = heapq.heappop(ready)
+        _, item = heapq.heappop(ready)
         proposed.append(item)
         for dependent in edges[item]:
             incoming[dependent] -= 1
             if incoming[dependent] == 0:
-                heapq.heappush(ready, (rank(dependent), position[dependent], dependent))
+                heapq.heappush(ready, (position[dependent], dependent))
     if len(proposed) != len(ids):
         raise AssistantError("依赖与当前覆盖优先级形成循环，无法自动排序；请手动核对作者说明")
     if proposed != ids:
-        reasons.append("其余模组按框架、汉化、补丁、内容分组；组内尽量沿用原顺序。类型分组是建议，作者说明优先")
+        reasons.append("只根据已识别的资源依赖和前后规则调整，不按模组类型推测顺序；其余尽量保留原顺序。作者说明优先")
     elif not reasons:
-        reasons.append("当前顺序符合已识别的依赖与类型建议")
+        reasons.append("未发现需要改变顺序的依赖或规则；保留当前顺序，不代表已经证明兼容")
     return OrderSuggestion(proposed, reasons)
 
 
 def save_order(env: Environment, ids: list[str], process_guard=game_running) -> str:
+    process_guard = scoped_game_guard(env, process_guard)
     if process_guard():
         raise AssistantError("请先关闭游戏和服务器，再保存模组顺序")
     current = read_order(env)

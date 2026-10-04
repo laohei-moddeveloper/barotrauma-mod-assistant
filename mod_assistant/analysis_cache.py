@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import xml.etree.ElementTree as ET
-from .core import AssistantError, Cancelled, atomic_json, load_package, within
+from .core import AssistantError, Cancelled, atomic_json, load_package, within, mod_files
 from .mod_analysis import Features, KIND_BY_TAG, inspect
 
 SCHEMA = 2
@@ -44,11 +44,16 @@ def decode(data):
 def signature(mod, metadata, cancel=None):
     rows = []
     if mod.source and mod.source.is_dir():
-        for path in mod.source.rglob('*'):
-            if cancel and cancel.is_set(): raise Cancelled('分析已停止')
-            if path.suffix.casefold() in ('.xml','.lua','.cs','.dll') and path.is_file() and within(path,mod.source):
-                stat = path.stat()
-                rows.append((path.relative_to(mod.source).as_posix(),stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
+        try:
+            for path in mod_files(mod.source):
+                if cancel and cancel.is_set(): raise Cancelled('分析已停止')
+                if path.suffix.casefold() in ('.xml','.lua','.cs','.dll'):
+                    stat = path.stat()
+                    rows.append((path.relative_to(mod.source).as_posix(),stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
+        except Cancelled:
+            raise
+        except (OSError,AssistantError):
+            rows.append(('unsafe-or-unreadable',0,0,0))
     # Match the existing Path ordering, including Windows case folding, so
     # optimization does not invalidate unchanged caches from earlier versions.
     value = [str(mod.source),mod.name,sorted(rows,key=lambda row:Path(row[0])),metadata]

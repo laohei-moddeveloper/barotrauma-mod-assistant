@@ -3,6 +3,7 @@ from dataclasses import asdict
 from pathlib import Path
 import re
 from .luacs import status
+from .core import AssistantError, reject_link, within
 
 def recent_logs(env):
     candidates = set()
@@ -12,8 +13,17 @@ def recent_logs(env):
         for name in ('Logs','logs','ServerLogs','DebugConsole','LuaCsLogs'):
             folder = root/name
             if folder.is_dir():
+                try: reject_link(folder)
+                except AssistantError: continue
                 candidates.update(folder.glob('*.txt')); candidates.update(folder.glob('*.log'))
-    return sorted((p for p in candidates if p.is_file()),key=lambda p:p.stat().st_mtime,reverse=True)[:20]
+    approved=[]
+    for path in candidates:
+        try:
+            reject_link(path)
+            if path.is_file() and any(within(path,root) for root in (env.game,env.player)):
+                approved.append(path)
+        except (OSError,AssistantError):continue
+    return sorted(approved,key=lambda p:p.stat().st_mtime,reverse=True)[:20]
 
 def redact(text, env=None):
     if env:

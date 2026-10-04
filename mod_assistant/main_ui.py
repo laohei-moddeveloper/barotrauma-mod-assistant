@@ -60,7 +60,7 @@ class MainInterface:
         app=self.app
         header=self.frame(app.root,padx=22,pady=6); header.pack(fill='x')
         identity=self.frame(header); identity.pack(side='left')
-        self.identity_label=app.label(identity,'潜渊症 · 模组助手',font=('Microsoft YaHei UI',20,'bold'))
+        self.identity_label=app.label(identity,'BaroPy',font=('Microsoft YaHei UI',20,'bold'))
         self.identity_label.pack(anchor='w')
         app.button(header,'外观设置',lambda:self.notebook.select(self.settings_page),busy=False).pack(side='right')
         self.language=tk.StringVar(value=LANGUAGES[app.locale.language])
@@ -75,6 +75,7 @@ class MainInterface:
         app.update_button=app.button(toolbar,'开始并行更新',lambda:app.start_update(True),primary=True)
         app.update_button.pack(side='left',padx=(0,10))
         app.refresh_button=app.button(toolbar,'重新检测',app.scan,requires_game=False); app.refresh_button.pack(side='left',padx=(0,10))
+        app.button(toolbar,'联网检测',app.online_scan,requires_game=False).pack(side='left',padx=(0,10))
         app.button(toolbar,'启动游戏',app.launch).pack(side='left')
         app.stop_button=app.button(toolbar,'停止任务',app.stop,busy=False)
         app.stop_button.pack(side='right'); app.stop_button.configure(state='disabled')
@@ -227,6 +228,7 @@ class MainInterface:
         app.button(operations,'保存更新设置',self.save_operations,requires_game=False).pack(anchor='w',pady=(12,6))
         app.button(operations,'选择游戏目录',app.choose_game,requires_game=False).pack(anchor='w',pady=6)
         app.button(operations,'首次使用与环境检查',app.environment_help,busy=False).pack(anchor='w',pady=6)
+        app.button(operations,'访问范围与隐私',app.show_access,busy=False).pack(anchor='w',pady=6)
         app.label(operations,textvariable=app.storage_status,bg=PANEL,fg=MUTED,wraplength=400,justify='left').pack(anchor='w',pady=6)
         app.label(operations,'F5 重新检测 · Ctrl+U 开始更新\nEsc 停止助手任务 · Ctrl+F 搜索模组',bg=PANEL,fg=MUTED,
                   justify='left',font=('Microsoft YaHei UI',9)).pack(anchor='w',pady=(16,0))

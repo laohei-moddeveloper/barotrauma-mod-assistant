@@ -27,7 +27,7 @@ class ManagementDialog:
         tk.Checkbutton(profiles,text='允许使用本机当前版本/文件（有差异时不保证与房主一致）',variable=self.allow,
                        bg='#0b1422',fg='#8fa6bf',selectcolor='#142237',activebackground='#0b1422').pack(anchor='w',pady=5)
         self.buttons(profiles,[('保存当前配置',self.save_current),('导入清单',self.import_file),('导出选中配置',self.export_file),
-                              ('检查差异',self.compare),('应用配置',lambda:self.apply(False)),('订阅下载并应用',lambda:self.apply(True))])
+                              ('检查差异',self.compare),('应用配置',lambda:self.apply(False)),('下载并应用',lambda:self.apply(True))])
         self.buttons(snapshots,[('保存完整快照',self.capture_snapshot),('恢复选中快照',self.restore_snapshot)])
         app.label(snapshots,'快照独立复制文件，会占用磁盘空间。仅能恢复本机已保存的副本，游戏版本变化时会停止恢复。',
                   fg='#8fa6bf',wraplength=880).pack(anchor='w',pady=8)
@@ -151,6 +151,7 @@ class ManagementDialog:
 
     def apply(self,download):
         if self.busy(): return
+        if download and not self.app.confirm_network(): return
         try: data=self.selected_profile()
         except AssistantError as error: self.app.dialogs.showinfo('选择配置',str(error),parent=self.window); return
         allow=self.allow.get()

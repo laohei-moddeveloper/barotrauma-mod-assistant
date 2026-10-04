@@ -33,6 +33,7 @@ from .appearance import Appearance
 from .main_ui import MainInterface
 from .i18n import Localizer, Dialogs, LANGUAGES
 from .preferences import load_preferences
+from .access import access_report, NETWORK_NOTICE, LUACS_NOTICE
 
 STATE = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "BarotraumaModAssistant"
 BG, PANEL, TEXT, MUTED, ACCENT = "#0b1422", "#142237", "#e8f0fa", "#8fa6bf", "#57dac4"
@@ -41,7 +42,7 @@ BG, PANEL, TEXT, MUTED, ACCENT = "#0b1422", "#142237", "#e8f0fa", "#8fa6bf", "#5
 class App:
     def __init__(self, root, auto_scan=True):
         self.root = root
-        self.root.title(f"潜渊症 · 模组更新助手 {VERSION}")
+        self.root.title(f"BaroPy · {VERSION}")
         self.root.configure(bg=BG)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.root.report_callback_exception = self.callback_error
@@ -261,7 +262,16 @@ class App:
         self.worker = threading.Thread(target=run, name="AssistantWorker", daemon=False)
         self.worker.start()
 
-    def scan(self, force=False):
+    def confirm_network(self):
+        return self.dialogs.askyesno('连接 Steam 的访问说明', NETWORK_NOTICE, parent=self.root)
+
+    def online_scan(self):
+        if self.confirm_network(): self.scan(network=True)
+
+    def show_access(self):
+        self.text_report('访问范围与隐私', access_report(self.env, self.locale.language))
+
+    def scan(self, force=False, network=False):
         lightweight = self.light_detection.get()
         self.status.set("正在检测游戏目录、模组缓存与 Steam 状态…")
 
@@ -273,12 +283,12 @@ class App:
             if not (env.game / 'config_player.xml').is_file():
                 raise AssistantError('游戏尚未生成配置文件；请先启动到主菜单再退出，然后重新检测。')
             try:
-                running = game_running()
+                running = game_running(env)
             except AssistantError as error:
                 running = None
-                self.events.put({"kind": "log", "message": "无法确认游戏进程：" + str(error)})
+                self.events.put({"kind": "log", "message": "无法确认游戏文件占用：" + str(error)})
             self.events.put({"kind": "scan_status", "message":
-                             "游戏正在运行：只读检测模组；更新和启用切换需关闭游戏" if running else
+                             "游戏文件被占用或状态未知：只读检测；修改前请关闭游戏并检查占用" if running else
                              "正在读取本地模组与启用状态…"})
             mods = inventory(env)
             light = bool(running is not False and lightweight)
@@ -288,8 +298,10 @@ class App:
             online = False
             bridge = None
             try:
+                if not network:
+                    raise AssistantError('默认本地检测；需要公开工坊资料时，请主动选择“联网检测”。')
                 if light:
-                    raise AssistantError('游戏运行中：轻量模式暂不查询 Steam 工坊')
+                    raise AssistantError('游戏文件被占用：轻量模式暂不查询 Steam 工坊')
                 bridge = SteamBridge(env).connect()
                 bridge.pump()
                 subscribed = bridge.subscribed()
@@ -316,7 +328,7 @@ class App:
                 if bridge:
                     bridge.close()
             self.events.put({"kind": "scan_status", "message": "正在读取模组公开资料…"})
-            metadata, metadata_available = workshop_details(env, [mod.item_id for mod in mods], allow_network=not light, force=force,
+            metadata, metadata_available = workshop_details(env, [mod.item_id for mod in mods], allow_network=network and not light, force=force,
                 cancel=self.cancel, emit=lambda message:self.events.put({'kind':'log','message':message}))
             self.events.put({"kind": "scan_status", "message":
                              f"正在比对 {len(mods)} 个模组的资源和代码…"})
@@ -572,6 +584,8 @@ class App:
     def install_luacs(self):
         if self.env is None:
             return
+        if not self.dialogs.askyesno('LuaCs 与脚本权限说明', LUACS_NOTICE, parent=self.root):
+            return
         self.status.set("正在准备 LuaCs 安装与 C# 设置…")
         def install():
             installer = LuaCsInstaller(self.env, lambda message: self.events.put(
@@ -641,6 +655,8 @@ class App:
             return
         if not self.selected:
             self.dialogs.showinfo("选择模组", "请勾选需要更新的模组，或点击全选。", parent=self.root)
+            return
+        if online and not self.confirm_network():
             return
         try:
             downloads = max(1, min(12, self.download_slots.get()))
@@ -793,14 +809,14 @@ class App:
                 self.tree.delete(*self.tree.get_children())
                 self.status.set(f'{len(self.mods)} 个订阅 / 缓存模组 · ' +
                                 ("Steam 已连接" if event["online"] else "本地检测模式") +
-                                (" · 游戏运行中（仅检测）" if event["game_running"] else "") +
+                                (" · 文件被占用或状态未知（仅检测）" if event["game_running"] else "") +
                                 f" · 游戏：{self.env.game}")
                 self.log("本机检测完成。完整缓存可以直接安装，不需要先删除重下。")
                 stats=event['analysis_stats']
                 self.log(f"分析缓存：复用 {stats['reused']} 个，分析变化 {stats['scanned']} 个，待完整检测 {stats['deferred']} 个。")
                 if event['light']:
                     self.status.set(self.status.get()+' · 轻量检测，兼容资料待刷新')
-                    self.log('游戏运行中没有遍历模组资源或读取脚本；已有分析仅作参考，关闭游戏后重新检测更新结论。')
+                    self.log('文件被占用或状态未知时不遍历模组资源或读取脚本；已有分析仅作参考，关闭游戏并检查占用后重新检测。')
                 if not event["metadata_available"]:
                     self.log("工坊公开资料暂不可用；类型和兼容性主要根据本地资源分析。")
                 changed = True

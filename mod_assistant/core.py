@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 import re
 import shutil
-import subprocess
+import stat
 import threading
 import time
 import uuid
@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 APP_ID = 602960
-GAME_PROCESSES = {"barotrauma.exe", "dedicatedserver.exe"}
+GAME_EXECUTABLES = ("Barotrauma.exe", "DedicatedServer.exe")
 
 
 class AssistantError(Exception):
@@ -99,7 +99,7 @@ def within(path: Path, root: Path) -> bool:
 
 def reject_link(path: Path):
     info = path.lstat()
-    if path.is_symlink() or getattr(info, "st_file_attributes", 0) & 0x400:
+    if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
         raise AssistantError(f"不处理符号链接或目录联接：{path.name}")
 
 
@@ -144,38 +144,55 @@ def files_snapshot(folder: Path) -> dict[str, tuple[int, int]]:
     return dict(sorted(files.items()))
 
 
-def game_running() -> bool:
+def executable_in_use(path: Path) -> bool:
+    """Probe one existing game executable; never enumerate or open processes.
+
+    OPEN_EXISTING requests a temporary write-access handle without writing any
+    bytes. Windows refuses that handle for an executable mapped by its loader.
+    Other file-sharing conflicts also block changes conservatively. Access
+    errors are unknown, not evidence that the game is closed.
+    """
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    open_file = kernel.CreateFileW
+    open_file.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+                          ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    open_file.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel.CloseHandle.restype = wintypes.BOOL
+    # No WriteFile, truncation, file creation, PID queries, or process handles.
+    handle = open_file(str(path), 0x40000000, 7, None, 3, 0x80, None)
+    if handle == ctypes.c_void_p(-1).value:
+        code = ctypes.get_last_error()
+        if code in (32, 33):
+            return True
+        raise AssistantError("无法确认游戏文件占用状态；保持只读，请检查游戏目录权限和文件占用。")
+    kernel.CloseHandle(handle)
+    return False
+
+
+def game_running(env=None) -> bool:
     if os.name != "nt":
         return False
-    from ctypes import wintypes
-
-    class ProcessEntry(ctypes.Structure):
-        _fields_ = [("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD),
-                    ("th32ProcessID", wintypes.DWORD), ("th32DefaultHeapID", ctypes.c_size_t),
-                    ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
-                    ("th32ParentProcessID", wintypes.DWORD), ("pcPriClassBase", wintypes.LONG),
-                    ("dwFlags", wintypes.DWORD), ("szExeFile", wintypes.WCHAR * 260)]
-
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
-    kernel.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
-    kernel.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry)]
-    kernel.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry)]
-    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-    handle = kernel.CreateToolhelp32Snapshot(2, 0)
-    if handle == ctypes.c_void_p(-1).value:
-        raise AssistantError("无法检测游戏进程，暂不安装")
-    try:
-        entry = ProcessEntry()
-        entry.dwSize = ctypes.sizeof(entry)
-        success = kernel.Process32FirstW(handle, ctypes.byref(entry))
-        while success:
-            if entry.szExeFile.lower() in GAME_PROCESSES:
+    env = env or discover()
+    root = env.game.resolve()
+    client = root / GAME_EXECUTABLES[0]
+    if not client.is_file():
+        raise AssistantError("没有找到游戏程序，无法确认文件占用状态。")
+    for name in GAME_EXECUTABLES:
+        path = root / name
+        if path.is_file():
+            reject_link(path)
+            if not within(path, root):
+                raise AssistantError("游戏程序路径超出所选游戏目录。")
+            if executable_in_use(path):
                 return True
-            success = kernel.Process32NextW(handle, ctypes.byref(entry))
-        return False
-    finally:
-        kernel.CloseHandle(handle)
+    return False
+
+
+def scoped_game_guard(env, guard=game_running):
+    """Default safety check belongs to this chosen game, not a system scan."""
+    return (lambda: game_running(env)) if guard is game_running else guard
 
 
 @dataclass
@@ -283,12 +300,32 @@ def discover(game_override: str = "") -> Environment:
 
 def load_package(folder: Path) -> ET.Element:
     try:
+        reject_link(folder)
+        reject_link(folder / 'filelist.xml')
         root = ET.parse(folder / "filelist.xml").getroot()
     except (OSError, ET.ParseError) as error:
         raise AssistantError(f"模组清单损坏或缺失：{error}") from error
     if root.tag.lower() != "contentpackage" or not root.get("name", "").strip():
         raise AssistantError("模组清单缺少 contentpackage 或名称")
     return root
+
+
+def mod_files(folder: Path):
+    """Walk an approved mod folder without following links or junctions."""
+    reject_link(folder)
+    for directory, directories, names in os.walk(folder, followlinks=False):
+        base = Path(directory)
+        for child in directories:
+            reject_link(base / child)
+        for name in names:
+            path = base / name
+            reject_link(path)
+            # os.walk names are single directory entries. All parents above
+            # were checked before descent, so lexical containment is enough;
+            # resolving every texture file would repeat expensive I/O.
+            if not path.is_relative_to(folder):
+                raise AssistantError('模组文件超出自身目录，不读取。')
+            yield path
 
 
 @dataclass
@@ -416,7 +453,7 @@ class Installer:
                  process_guard=game_running, fault=None):
         self.env = env
         self.guard = guard
-        self.process_guard = process_guard
+        self.process_guard = scoped_game_guard(env, process_guard)
         self.fault = fault or (lambda phase: None)
 
     def check(self, item_id, cancel):

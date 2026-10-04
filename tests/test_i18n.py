@@ -19,7 +19,9 @@ class TranslationTests(unittest.TestCase):
         missing=[]
         # Regexes are analysis input, not displayed copy. Never translate them.
         for path in (Path(__file__).resolve().parents[1]/'mod_assistant').glob('*.py'):
-            if path.stem.startswith('i18n'):
+            # access.py provides explicit Chinese and English reports; the
+            # English branch is checked by test_access instead of EN lookup.
+            if path.stem.startswith('i18n') or path.stem=='access':
                 continue
             tree=ast.parse(path.read_text(encoding='utf-8'))
             parents={child:node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}

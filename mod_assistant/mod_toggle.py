@@ -11,7 +11,7 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 
-from .core import AssistantError, Environment, game_running, load_package, within
+from .core import AssistantError, Environment, game_running, load_package, within, scoped_game_guard
 
 
 BLOCK = re.compile(r"<regularpackages(?:\s[^>]*)?>.*?</regularpackages\s*>", re.I | re.S)
@@ -69,6 +69,7 @@ class ToggleResult:
 
 def set_enabled(env: Environment, item_id: str, enabled: bool,
                 process_guard=game_running, source: Path | None = None) -> ToggleResult:
+    process_guard = scoped_game_guard(env, process_guard)
     is_workshop = item_id.isdecimal()
     if not is_workshop and (source is None or local_id(source) != item_id or not any(
             within(source, root) for root in (env.game / "LocalMods", env.player / "LocalMods"))):

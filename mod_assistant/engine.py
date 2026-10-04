@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 import threading
 import time
-from .core import AssistantError, Cancelled, Environment, Installer, atomic_json, game_running
+from .core import AssistantError, Cancelled, Environment, Installer, atomic_json, game_running, scoped_game_guard
 from .steam import DOWNLOADING, PENDING, SUBSCRIBED, SteamBridge, result_text
 
 
@@ -20,7 +20,7 @@ class UpdateEngine:
         self.retries = retries
         self.bridge_factory = bridge_factory
         self.installer_factory = installer_factory
-        self.process_guard = process_guard
+        self.process_guard = scoped_game_guard(env, process_guard)
         self.cancel = threading.Event()
 
     def event(self, item, stage, progress=0, detail=""):

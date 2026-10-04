@@ -8,7 +8,7 @@ import re
 import time
 import uuid
 import xml.etree.ElementTree as ET
-from .core import APP_ID, AssistantError, atomic_json, files_snapshot, game_running, inventory, load_package, reject_link, within
+from .core import APP_ID, AssistantError, atomic_json, files_snapshot, game_running, inventory, load_package, reject_link, within, scoped_game_guard
 from .mod_toggle import BLOCK, CORE, configured_key, local_id
 from .mod_order import read_order
 
@@ -159,6 +159,7 @@ def config_bytes(env, data, mods=None, original=None):
     return (b'\xef\xbb\xbf' if original.startswith(b'\xef\xbb\xbf') else b'') + source.encode('utf-8')
 
 def commit_config(env, replacement, original, process_guard=game_running):
+    process_guard = scoped_game_guard(env, process_guard)
     if process_guard(): raise AssistantError('请先关闭游戏和服务器，再切换配置')
     config = env.game / 'config_player.xml'; reject_link(config)
     if config.read_bytes() != original: raise AssistantError('游戏配置已经被其他程序修改，请重新检测')
@@ -178,6 +179,7 @@ def commit_config(env, replacement, original, process_guard=game_running):
     return str(backup)
 
 def apply_profile(env, data, mods=None, process_guard=game_running):
+    process_guard = scoped_game_guard(env, process_guard)
     if process_guard(): raise AssistantError('请先关闭游戏和服务器，再切换配置')
     original = (env.game / 'config_player.xml').read_bytes()
     return commit_config(env, config_bytes(env,data,mods,original), original, process_guard)

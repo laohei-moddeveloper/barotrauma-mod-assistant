@@ -11,7 +11,7 @@ import threading
 import time
 import uuid
 import xml.etree.ElementTree as ET
-from .core import AssistantError, Cancelled, atomic_json, game_running, inventory, reject_link, within
+from .core import AssistantError, Cancelled, atomic_json, game_running, inventory, reject_link, within, scoped_game_guard
 from .profiles import capture_profile, game_version, installed_path
 from .mod_toggle import BLOCK, CORE
 
@@ -43,7 +43,7 @@ def tree(folder, hashes=True, check=lambda:None):
 
 class SnapshotStore:
     def __init__(self, env, emit=lambda message:None, process_guard=game_running, cancel=None, fault=lambda phase:None):
-        self.env, self.emit, self.guard = env, emit, process_guard
+        self.env, self.emit, self.guard = env, emit, scoped_game_guard(env, process_guard)
         self.cancel = cancel or threading.Event(); self.fault = fault
         self.last_guard=0
         self.root = env.work / 'snapshots'

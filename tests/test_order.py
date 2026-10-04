@@ -32,7 +32,7 @@ class OrderTests(unittest.TestCase):
 
     def tearDown(self): self.temp.cleanup()
 
-    def test_auto_order_respects_explicit_path_dependency_and_types(self):
+    def test_auto_order_respects_dependency_without_guessing_category_order(self):
         ids = ["103", "101", "102"]
         mods = {"101": Mod("101", "Base", self.env.installed / "101"),
                 "102": Mod("102", "LuaCs", self.env.installed / "102"),
@@ -42,7 +42,7 @@ class OrderTests(unittest.TestCase):
                     "103": Features("103", "Base 汉化补丁", kinds=("语言/文本",),
                                     path_dependencies={"Base"})}
         result = suggest_order(ids, mods, features)
-        self.assertEqual(result.ids, ["102", "101", "103"])
+        self.assertEqual(result.ids, ["101", "103", "102"])
         self.assertIn("资源路径依赖", " ".join(result.reasons))
 
     def test_save_order_moves_comments_with_packages_and_keeps_other_settings(self):

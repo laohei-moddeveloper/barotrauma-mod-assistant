@@ -15,7 +15,7 @@ import uuid
 import xml.etree.ElementTree as ET
 from zipfile import ZipFile
 
-from .core import AssistantError, Cancelled, Environment, atomic_json, game_running, reject_link, within
+from .core import AssistantError, Cancelled, Environment, atomic_json, game_running, reject_link, within, scoped_game_guard
 
 RELEASE_API = "https://api.github.com/repos/evilfactory/LuaCsForBarotrauma/releases/tags/latest"
 ASSET_NAME = "luacsforbarotrauma_patch_windows_client.zip"
@@ -168,7 +168,7 @@ def _hash(path: Path) -> str:
 class LuaCsInstaller:
     def __init__(self, env: Environment, emit=lambda message: None, process_guard=game_running,
                  release_loader=release_info, opener=urllib.request.urlopen, fault=lambda phase: None):
-        self.env, self.emit, self.process_guard = env, emit, process_guard
+        self.env, self.emit, self.process_guard = env, emit, scoped_game_guard(env, process_guard)
         self.release_loader, self.opener, self.fault = release_loader, opener, fault
         self.cancel = threading.Event()
 

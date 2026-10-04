@@ -256,11 +256,11 @@ class FriendAndLogTests(Fixture):
         with self.assertRaisesRegex(AssistantError,'本地模组'): apply_with_downloads(self.env,data,download=True,process_guard=self.guard)
 
     def test_download_missing_then_apply_together_and_restore_point_exists(self):
-        data=self.profile(['999','101']); subscribed=[]; fixture=self
+        data=self.profile(['999','101']); fixture=self
         class Bridge:
             def __init__(self,env): pass
             def connect(self): return self
-            def subscribe(self,item,**kwargs): subscribed.append(item)
+            def state(self,item): return 1
             def close(self): pass
         class Engine:
             def __init__(self,*args,**kwargs): pass
@@ -268,7 +268,7 @@ class FriendAndLogTests(Fixture):
                 for item in ids: fixture.make(item)
                 return {'errors':{},'completed':ids,'cancelled':False}
         result=apply_with_downloads(self.env,data,True,process_guard=self.guard,bridge_factory=Bridge,engine_factory=Engine,verify_items=lambda ids:None)
-        self.assertEqual(subscribed,['999']); self.assertEqual(read_order(self.env),['999','101'])
+        self.assertEqual(read_order(self.env),['999','101'])
         self.assertEqual(len(self.store.list()),1)
         self.store.restore(result['snapshot']); self.assertFalse((self.env.installed/'999').exists())
         self.assertEqual(read_order(self.env),['101','102'])
@@ -278,7 +278,7 @@ class FriendAndLogTests(Fixture):
         class Bridge:
             def __init__(self,env): pass
             def connect(self): return self
-            def subscribe(self,*args,**kwargs): pass
+            def state(self,item): return 1
             def close(self): pass
         class Engine:
             def __init__(self,*args,**kwargs): pass

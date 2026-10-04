@@ -11,7 +11,7 @@ import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 
-from .core import APP_ID, Cancelled, Environment, Mod, atomic_json, load_package, within
+from .core import APP_ID, AssistantError, Cancelled, Environment, Mod, atomic_json, load_package, within, mod_files, reject_link
 
 
 KIND_BY_TAG = {
@@ -159,7 +159,13 @@ def _resource_path(folder: Path, name: str, own_name: str) -> Path | None:
     if not value.startswith("%ModDir%/"):
         return None
     path = folder / value[len("%ModDir%/"):]
-    return path if within(path, folder) and path.is_file() else None
+    if not within(path, folder) or not path.is_file():
+        return None
+    for part in [path, *path.parents]:
+        reject_link(part)
+        if part == folder:
+            break
+    return path
 
 
 def _definitions(path: Path, category: str) -> set[tuple[str, str, str]]:
@@ -195,7 +201,7 @@ def _definition_info(path: Path, category: str):
 
 
 def _code_signals(folder: Path, result: Features):
-    for path in folder.rglob("*"):
+    for path in mod_files(folder):
         if not path.is_file():
             continue
         if not within(path, folder) or path.is_symlink():
@@ -299,7 +305,7 @@ def inspect(mod: Mod, metadata: dict | None = None) -> Features:
         if result.code_files and "框架/脚本" not in result.kinds and "脚本/工具" not in result.kinds:
             result.kinds = result.kinds + ("脚本/工具",)
         return result
-    except (OSError, ET.ParseError):
+    except (OSError, ET.ParseError, AssistantError):
         result.partial = True
         return result
 
