@@ -1,5 +1,16 @@
 # 版本记录
 
+## 0.7.1
+
+BaroPy is now **BaroDock**, with matching Chinese/English Workshop titles, application headings, access reports, guides, desktop shortcuts, screenshots and animated cover. This is the same standalone Barotrauma mod manager. The access restrictions and sorting improvements released in 0.7.0 remain in place.
+
+The executable name, preferences directory, repository URL and existing JSON rule schema are retained for upgrade compatibility. Existing exported rules continue to work. The desktop installer renames an old BaroPy shortcut only if it points to this tool and the new shortcut does not already exist; unrelated shortcuts are retained.
+
+After Steam downloads the update, close the old tool and run the desktop installer again. Chinese and English guides, access notes and SHA-256 checksums are included. Validation: 133 existing unit/isolated checks, packaged bilingual and three-theme checks, screenshot/layout checks and both desktop installers. This branding update does not add broader access or gameplay changes.
+
+中文：BaroPy 正式更名为 BaroDock，统一程序、工坊双语标题、指南、桌面入口和动态封面。保留程序文件名、设置目录、仓库链接及规则格式，老用户升级无需重新配置。访问范围限制和排序改进沿用 0.7.0。
+
+
 ## 0.7.0
 
 Community feedback identified unnecessary system access. This release removes system-wide process enumeration and automatic subscription operations, makes startup/Refresh local by default, explains online/LuaCs access before actions, and includes a bilingual access report and document. Ordinary desktop application; not an OS sandbox.

@@ -13,10 +13,10 @@ def access_report(env=None, language='zh'):
     player = str(env.player) if env else ('Not detected' if language == 'en' else '尚未检测')
     if language == 'en':
         return '\n'.join([
-            'BaroPy: access & privacy', '',
+            'BaroDock: access & privacy', '',
             'Default: local inspection. Startup and Refresh do not connect to Steam or fetch public metadata.',
             'Reads: the selected Barotrauma folder, this Windows user\'s Barotrauma mod folder, '
-            'Steam installation/library manifests for app 602960, and BaroPy settings.',
+            'Steam installation/library manifests for app 602960, and BaroDock settings.',
             'Steam installation discovery reads only Valve/Steam registry values. No registry writes.',
             'Game folder: '+game, 'Player folder: '+player, '',
             'Before changing files, only Barotrauma.exe and DedicatedServer.exe in the selected folder '
@@ -37,7 +37,7 @@ def access_report(env=None, language='zh'):
             'Details and limitations: ACCESS_AND_PRIVACY.md in the release and public source repository.'
         ])
     return '\n'.join([
-        'BaroPy：访问范围与隐私', '',
+        'BaroDock：访问范围与隐私', '',
         '默认仅本地检测；启动和重新检测不连接 Steam，也不获取公开模组资料。',
         '读取范围：所选潜渊症目录、当前 Windows 用户的游戏模组目录、Steam 的游戏 602960 '
         '安装/工坊清单，以及助手设置。定位 Steam 仅读取 Valve/Steam 注册表值，不写注册表。',

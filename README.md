@@ -1,6 +1,6 @@
-# BaroPy｜潜渊症模组管理
+# BaroDock｜潜渊症模组管理
 
-面向 Windows 64 位 Steam 版《潜渊症》（Barotrauma）的独立模组管理工具。当前版本 **0.7.0**。
+面向 Windows 64 位 Steam 版《潜渊症》（Barotrauma）的独立模组管理工具。当前版本 **0.7.1**。
 
 [English guide](README_EN.md) · 程序右上角可在「中文 / English」之间实时切换，自动保存语言选择。
 
@@ -39,6 +39,7 @@ Steam 负责实际下载调度，助手不能保证突破客户端队列或带�
 | 0.6.0 | 中文/English 实时切换、双语提示与报告、英文说明与安装入口 | 96 项测试 |
 | 0.6.1 | 新用户环境指引、LuaCs 备份状态、设置容错、界面和扫描效率改进 | 123 项测试 |
 | 0.7.0 | 访问范围收紧、本地检测默认、解释排序及规则导入导出、BaroPy 品牌 | 133 项测试 |
+| 0.7.1 | 更名 BaroDock，统一程序、工坊、封面及桌面入口 | 133 项测试 |
 
 版本变化见 [CHANGELOG](CHANGELOG.md)，发布及重建说明见 [releases](releases)，验证范围见 [docs/validation.md](docs/validation.md)。0.1.0 与 0.2.0 的安装包从对应历史源码重新构建，发布记录会明确标注。
 

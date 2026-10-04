@@ -1,6 +1,6 @@
-# BaroPy — access and privacy / 访问范围与隐私
+# BaroDock — access and privacy / 访问范围与隐私
 
-Applies to **0.7.0**. BaroPy is an optional standalone Windows application, distributed through the Workshop; it is not loaded inside the game. It runs as the current user, without requesting administrator elevation. **It is not an operating-system sandbox.** These are limits implemented by our code, not a guarantee that Steam, LuaCs or other mods are isolated.
+Applies to **0.7.1** (renamed from BaroPy; access changes introduced in 0.7.0). BaroDock is an optional standalone Windows application, distributed through the Workshop; it is not loaded inside the game. It runs as the current user, without requesting administrator elevation. **It is not an operating-system sandbox.** These are limits implemented by our code, not a guarantee that Steam, LuaCs or other mods are isolated.
 
 ## What changed following community feedback
 
@@ -18,7 +18,7 @@ The previous process inventory was broader than necessary. It should have been s
 | Operation | Purpose and scope |
 | --- | --- |
 | Find installation | Read Valve/Steam registry values and Steam library/game manifests to locate app 602960. No registry writes. A user-selected game folder takes precedence. |
-| Local inspection | Read the selected Barotrauma folder, the current Windows user's Barotrauma mod/config folders, local Workshop manifests and BaroPy settings. Parse mod resources/scripts as text; do not execute them. |
+| Local inspection | Read the selected Barotrauma folder, the current Windows user's Barotrauma mod/config folders, local Workshop manifests and BaroDock settings. Parse mod resources/scripts as text; do not execute them. |
 | File availability | Probe only `Barotrauma.exe` and `DedicatedServer.exe` in the selected installation. Request a temporary existing-file handle with write access; **write no bytes**, create no file and change no content. Windows prevents this access to a running executable. Sharing conflicts or unknown access errors block modifications. This cannot identify the holder or detect another installation. |
 | Online inspection/update | On request, use the game's official Steamworks DLL for Barotrauma subscriptions/download state. Public metadata requests send item IDs to Steam. Download only subscribed items; never subscribe automatically. Steam can show the game as running while connected. |
 | Apply changes | User-requested changes to mods, enabled packages, load order or profiles, with backups. Preferences, analysis cache and task logs are stored in user folders. Reports/rules go to a user-selected export location. |
@@ -37,7 +37,7 @@ This release does not remove every native call: reliable Workshop downloads stil
 
 ## 中文说明
 
-BaroPy 是通过工坊分发的独立 Windows 工具，不是在游戏中加载的模组。0.7.0 删除了遍历系统进程名称的代码及自动订阅功能；启动和重新检测默认只读取本地资料。联网检测、更新以及 LuaCs 安装由用户主动选择，操作前说明具体访问内容。
+BaroDock 是通过工坊分发的独立 Windows 工具，不是在游戏中加载的模组。0.7.0 删除了遍历系统进程名称的代码及自动订阅功能；启动和重新检测默认只读取本地资料。联网检测、更新以及 LuaCs 安装由用户主动选择，操作前说明具体访问内容。
 
 读取范围是所选游戏目录、当前用户的游戏模组与配置、Steam 安装和工坊清单及助手设置。定位 Steam 仅读取 Valve/Steam 注册表值，不写注册表。不执行被分析的模组代码，不跟随模组内的符号链接或目录联接。
 
@@ -51,4 +51,4 @@ BaroPy 是通过工坊分发的独立 Windows 工具，不是在游戏中加载�
 
 ## Sorting rules / 排序规则
 
-Inspired by [RimPy's explicit-rule approach](https://github.com/rimpy-custom/RimPy/wiki/Autosorting), without copying RimWorld-specific ordering assumptions. BaroPy now uses identified resource dependencies and local before/after rules, preserves existing overlapping-definition precedence where possible, and does not guess order from categories or names. Review all reasons before saving. JSON rule import/export is local, executes no code, checks cycles and requires confirmation before replacing local rules. Import alone does not change the game order. 作者说明优先；不把自动排序当作兼容保证。
+Inspired by [RimPy's explicit-rule approach](https://github.com/rimpy-custom/RimPy/wiki/Autosorting), without copying RimWorld-specific ordering assumptions. BaroDock now uses identified resource dependencies and local before/after rules, preserves existing overlapping-definition precedence where possible, and does not guess order from categories or names. Review all reasons before saving. JSON rule import/export is local, executes no code, checks cycles and requires confirmation before replacing local rules. Import alone does not change the game order. 作者说明优先；不把自动排序当作兼容保证。

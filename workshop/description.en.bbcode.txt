@@ -1,9 +1,9 @@
 [b]Source & downloads:[/b] [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant]Public GitHub repository[/url] · [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/latest]Latest release & checksums[/url]
 
-[h1]BaroPy — a little less setup before the next dive[/h1]
+[h1]BaroDock — a little less setup before the next dive[/h1]
 I built this tool after dealing with slow updates, confusing load orders and mismatched multiplayer setups. I hope it helps other players too. Your computers and mods can reveal problems I have missed; criticism, questions and small usability suggestions are welcome. Thank you for helping make it better.
 
-[b]Standalone Windows 64-bit application, not an in-game mod.[/b] Subscribe to get the files, then run a separate copy. Do not enable this package in the game or require it on a server. BaroPy itself needs no Python, LuaCs or C# setup.
+[b]Standalone Windows 64-bit application, not an in-game mod.[/b] Subscribe to get the files, then run a separate copy. Do not enable this package in the game or require it on a server. BaroDock itself needs no Python, LuaCs or C# setup.
 
 [h1]0.7.0: changes following community feedback[/h1]
 The earlier process checks were broader than necessary. This version removes system-wide process enumeration and automatic subscription calls. Startup and Refresh now inspect local files. Online actions and LuaCs installation explain access before you proceed. Thank you to the players who raised these concerns.
@@ -18,7 +18,7 @@ Online inspection/update uses the game's official Steam interface for Barotrauma
 [*]Subscribe and wait for Steam to finish. If necessary, open Barotrauma to the main menu to install Workshop files, then exit.
 [*]Press Win+R and open:
 [code]%LOCALAPPDATA%\Daedalic Entertainment GmbH\Barotrauma\WorkshopMods\Installed\__WORKSHOP_ID__[/code]
-[*]Run [b]Install-to-desktop.cmd[/b] to create a BaroPy shortcut, or copy BarotraumaModAssistant.exe into your own folder and run it there. No separate runtime needed.
+[*]Run [b]Install-to-desktop.cmd[/b] to create a BaroDock shortcut, or copy BarotraumaModAssistant.exe into your own folder and run it there. No separate runtime needed.
 [/olist]
 If that folder is missing, use Steam > Barotrauma > Manage > Browse local files, go up to steamapps, then open [code]workshop\content\602960\__WORKSHOP_ID__[/code] in the library where the item downloaded.
 The desktop copy is stored in [code]%LOCALAPPDATA%\BarotraumaModAssistant\WorkshopProgram[/code]
@@ -48,6 +48,6 @@ The desktop copy is stored in [code]%LOCALAPPDATA%\BarotraumaModAssistant\Worksh
 Please comment here or use [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/issues]GitHub Issues[/url]. Tell me what you wanted to do and what got in the way. You do not need to know code. I cannot promise immediate replies or every requested feature; confirmed changes will be documented.
 For bugs, share the version, steps and error text. Remove personal information from reports/logs; never send passwords, verification codes or credentials.
 
-[b]Current version: 0.7.0.[/b] 133 unit/isolated checks and packaged bilingual UI checks do not cover every computer, mod combination or real multiplayer session. Guides, access notes and SHA-256 checksums are included. No base-game files, third-party mods or personal setups are distributed. Unofficial community project.
+[b]Current version: 0.7.1.[/b] 133 unit/isolated checks and packaged bilingual UI checks do not cover every computer, mod combination or real multiplayer session. Guides, access notes and SHA-256 checksums are included. No base-game files, third-party mods or personal setups are distributed. Unofficial community project.
 
 [b]AI assistance:[/b] Development used AI assistance. The current cover is an original geometric layout built from code; earlier covers used AI assistance.

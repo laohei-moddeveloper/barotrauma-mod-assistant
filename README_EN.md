@@ -1,6 +1,6 @@
-# BaroPy | Barotrauma Mod Manager
+# BaroDock | Barotrauma Mod Manager
 
-Version **0.7.0** is a standalone mod manager for the Steam version of Barotrauma on **64-bit Windows**, with **English and Simplified Chinese** interfaces.
+Version **0.7.1** is a standalone mod manager for the Steam version of Barotrauma on **64-bit Windows**, with **English and Simplified Chinese** interfaces.
 
 [Download](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/latest) · [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3812360206&l=english) · [中文说明](使用说明.md)
 

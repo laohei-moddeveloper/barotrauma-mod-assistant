@@ -2,12 +2,12 @@
   "app_id": 602960,
   "id": "3812360206",
   "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=3812360206",
-  "title": "BaroPy｜潜渊症模组管理",
-  "version": "0.7.0",
+  "title": "BaroDock｜潜渊症模组管理",
+  "version": "0.7.1",
   "visibility": "public",
   "upload_confirmed": true,
   "legal_acceptance_required": false,
-  "title_en": "BaroPy | Barotrauma Mod Manager",
+  "title_en": "BaroDock | Barotrauma Mod Manager",
   "languages": [
     "schinese",
     "english"
@@ -16,7 +16,7 @@
     "zh",
     "en"
   ],
-  "executable_sha256": "6087932c1dbdc560c09bb845d4ec031df82dafa3090ec06c2f25af91e08c6cf2",
+  "executable_sha256": "5a1c9874f82c929dc2718f961d58de4ba02ec41e6c32c2f1ebfdd309c257fa91",
   "cover": {
     "file": "cover-en.gif",
     "language": "english",
@@ -27,9 +27,9 @@
     "frames": 4,
     "duration_ms": 3400,
     "loop": "infinite",
-    "bytes": 101908,
-    "sha256": "55d2b8cfe97fe6d2ee4fc17fde62f2b76609fa63fd276b155a6f3be1c7af1f0f",
-    "steam_preview_url": "https://images.steamusercontent.com/ugc/14506529743692801036/332758ED71266212F07689B4E01334CA4E7D9A56/",
+    "bytes": 103879,
+    "sha256": "1d2bd7acdad29644185ea2eee86feadfe1b87a544c7bdb4d2b7adeb4c444feee",
+    "steam_preview_url": "https://images.steamusercontent.com/ugc/18144334443291528270/1D12616F8E91328CAD4AE86227E8E4C04C3280CF/",
     "animated_upload_verified": true
   }
 }

@@ -191,7 +191,7 @@ class OrderDialog:
             self.app.dialogs.showerror('规则无法应用',str(error),parent=self.window)
 
     def export_rules(self):
-        path=self.app.files.asksaveasfilename(title='导出排序规则',defaultextension='.json',initialfile='BaroPy-order-rules.json',parent=self.window)
+        path=self.app.files.asksaveasfilename(title='导出排序规则',defaultextension='.json',initialfile='BaroDock-order-rules.json',parent=self.window)
         if not path:return
         try:
             atomic_json(Path(path),{'schema':'baropy-order-rules-v1',**check_rules(self.rules)})

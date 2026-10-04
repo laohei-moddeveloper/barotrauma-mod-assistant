@@ -42,7 +42,7 @@ BG, PANEL, TEXT, MUTED, ACCENT = "#0b1422", "#142237", "#e8f0fa", "#8fa6bf", "#5
 class App:
     def __init__(self, root, auto_scan=True):
         self.root = root
-        self.root.title(f"BaroPy · {VERSION}")
+        self.root.title(f"BaroDock · {VERSION}")
         self.root.configure(bg=BG)
         self.root.protocol("WM_DELETE_WINDOW", self.close)
         self.root.report_callback_exception = self.callback_error

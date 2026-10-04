@@ -60,7 +60,7 @@ class MainInterface:
         app=self.app
         header=self.frame(app.root,padx=22,pady=6); header.pack(fill='x')
         identity=self.frame(header); identity.pack(side='left')
-        self.identity_label=app.label(identity,'BaroPy',font=('Microsoft YaHei UI',20,'bold'))
+        self.identity_label=app.label(identity,'BaroDock',font=('Microsoft YaHei UI',20,'bold'))
         self.identity_label.pack(anchor='w')
         app.button(header,'外观设置',lambda:self.notebook.select(self.settings_page),busy=False).pack(side='right')
         self.language=tk.StringVar(value=LANGUAGES[app.locale.language])
