@@ -591,4 +591,5 @@ EN.update({
     ' · 文件被占用或状态未知（仅检测）': ' · Files busy or status unknown (inspection only)',
     '文件被占用或状态未知时不遍历模组资源或读取脚本；已有分析仅作参考，关闭游戏并检查占用后重新检测。': 'When files are busy or availability is unknown, resources and scripts are not scanned. Cached analysis is for reference; close the game, check file locks, then refresh.',
     '{0} 个模组 · 启用状态未知 · 已选更新 {1} 个': '{0} mods · Enabled state unknown · {1} selected for update',
+    '本地检测完成': 'Local inspection complete',
 })

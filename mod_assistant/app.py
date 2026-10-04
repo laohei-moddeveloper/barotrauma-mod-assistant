@@ -353,7 +353,7 @@ class App:
                         mod.status = "版本已同步"
                 online = True
             except Exception as error:
-                self.events.put({"kind": "log", "message": "本地检测完成；" + str(error)})
+                self.events.put({"kind": "log", "message": str(error) if not network else "本地检测完成；" + str(error)})
             finally:
                 if bridge:
                     bridge.close()
@@ -1035,6 +1035,7 @@ def self_check(report_path):
     def finish():
         if app.env is not None and not (app.worker and app.worker.is_alive()):
             appearance_checks = []
+            language_checks = []
             try:
                 assert len(app.interface.notebook.tabs()) == 3
                 assert len(app.tree.get_children()) == len(app.mods)

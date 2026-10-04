@@ -180,6 +180,7 @@ class WorkflowUiTests(UiTests):
         self.assertEqual(self.config.read_bytes(),before);dialog.window.destroy()
 
     def test_list_is_visible_before_deep_analysis_starts(self):
+        self.app.set_language('en',persist=False)
         actual=inspect_cached;observed=[];before=self.config.read_bytes()
         def slow_analysis(*args,**kwargs):
             self.app.drain()
@@ -194,6 +195,8 @@ class WorkflowUiTests(UiTests):
         bridge.assert_not_called();request.assert_not_called()
         self.assertEqual(self.config.read_bytes(),before)
         self.assertGreaterEqual(self.app.scan_timings['complete_seconds'],self.app.scan_timings['first_list_seconds'])
+        log=self.app.logs.get('1.0','end')
+        self.assertFalse(any('\u4e00'<=char<='\u9fff' for char in log),log)
 
     def test_missing_or_invalid_config_is_browsable_and_blocks_changes(self):
         self.config.unlink()

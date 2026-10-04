@@ -41,7 +41,7 @@ class FirstInstallTests(unittest.TestCase):
         (game/'Barotrauma.exe').touch()
         (library/'steamapps/appmanifest_602960.acf').write_text('"AppState" { "installdir" "CustomName" }')
         path = library.as_posix()
-        (self.steam/'steamapps/libraryfolders.vdf').write_text('"libraryfolders" { "1" "'+path+'" }')
+        (self.steam/'steamapps/libraryfolders.vdf').write_text('"libraryfolders" { "1" "'+path+'" }',encoding='utf-8')
         found = discover(str(self.root/'old game'))
         self.assertEqual(found.game, game)
         self.assertIn(library, found.libraries)
@@ -126,7 +126,12 @@ class NetworkAndCacheTests(Fixture):
         before=signature(mod,{})
         texture.write_bytes(b'image changed')
         self.assertEqual(signature(mod,{}),before)
-        (mod.source/'items.xml').write_text('<Items><Item identifier="changed"/></Items>')
+        resource=mod.source/'items.xml'
+        resource.write_text('<Items><Item identifier="changed"/></Items>',encoding='utf-8')
+        # Model an observable file-state change without relying on write timing
+        # or the host filesystem's timestamp resolution.
+        state=resource.stat()
+        os.utime(resource,ns=(state.st_atime_ns,state.st_mtime_ns+1_000_000_000))
         self.assertNotEqual(signature(mod,{}),before)
         cancel=threading.Event();cancel.set()
         with self.assertRaises(Cancelled):signature(mod,{},cancel)

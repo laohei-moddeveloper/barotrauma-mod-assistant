@@ -14,6 +14,9 @@ class UiTests(Fixture):
         super().setUp(); self.root=tk.Tk(); self.root.withdraw()
         self.state_patch=patch('mod_assistant.app.STATE',self.env.player/'AssistantState'); self.state_patch.start()
         self.app=App(self.root,auto_scan=False); self.app.env=self.env
+        # Semantic fixture assertions use Chinese; locale behavior and English
+        # presentation have dedicated checks. Do not depend on the host locale.
+        self.app.set_language('zh',persist=False)
         self.app.mods={mod.item_id:{'mod':mod,'stage':mod.status,'progress':0,'detail':''} for mod in inventory(self.env)}
         self.app.features=inspect_all([data['mod'] for data in self.app.mods.values()])
         self.app.runtime_luacs=self.app.runtime_csharp=True

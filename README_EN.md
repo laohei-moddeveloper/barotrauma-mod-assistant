@@ -54,6 +54,8 @@ New users should launch the game to its main menu and exit once before scanning.
 
 The mod list now updates changed rows instead of rewriting every row during progress. Scans avoid unnecessary texture file checks while retaining code/resource change detection. Repeated translations use a bounded cache. Temporary public-metadata failures reuse saved data with a one-minute retry delay; **Full reanalysis** refreshes metadata as well as local analysis when the service is available. These changes do not bypass Steam download limits.
 
+Incremental analysis checks relevant file sizes/timestamps rather than hashing every resource on each startup. If another tool changes bytes while preserving those attributes, use Full reanalysis after closing the game. Cached findings are not file-integrity proof.
+
 After a Workshop update, close the assistant and rerun the desktop installer or replace the copied executable. Steam updates Workshop files, not the separate desktop copy. Unsubscribing does not remove your desktop copy or preferences. Use supplied SHA-256 checksums to verify downloaded release files.
 
 When reporting a problem, include the version, reproduction steps, and exact error. Remove personal information from exported reports before sharing them. This community tool includes no base-game files, third-party mods, or credentials. The original cover was made with AI assistance.
