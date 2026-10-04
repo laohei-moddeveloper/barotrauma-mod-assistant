@@ -25,6 +25,11 @@
       "complete_seconds": 12.140999999999622
     },
     "community_feedback_reviewed": true,
+    "clean_windows_ci": {
+      "passed": true,
+      "url": "https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/actions/runs/37179369061",
+      "source_commit": "497f1c36714819b8eff012358d81c0e3632c72f9"
+    },
     "resumable_queue_and_draft_checks": true,
     "synthetic_local_benchmark": {
       "synthetic_only": true,
