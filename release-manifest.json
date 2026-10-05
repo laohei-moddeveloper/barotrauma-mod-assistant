@@ -6,8 +6,7 @@
     "en"
   ],
   "prepared_at_utc": "2026-10-05T04:21:33.757721+00:00",
-  "release_state": "candidate_awaiting_owner_approval",
-  "published": false,
+  "release_state": "release",
   "unit_tests_passed": 205,
   "packaged_self_check": true,
   "historical_binary_rebuilt": false,
@@ -47,8 +46,11 @@
     "administrator_elevation": false,
     "no_runtime_dependency_added": true,
     "clean_windows_ci": {
-      "run": false,
-      "reason": "pending approval and source push"
+      "run": true,
+      "passed": true,
+      "url": "https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/actions/runs/37263809964",
+      "source_commit": "48a0ef3b6073a47209a51aa724ef4a3df17c45d8",
+      "unit_tests_passed": 205
     },
     "synthetic_sort_benchmark": {
       "synthetic_only": true,
@@ -105,5 +107,6 @@
     "mod_assistant/tasks.py": "2061d93afa778590f1ea9351ee5b2f189f164a99403b189f1daf511d2604c718",
     "mod_assistant/xml_compare.py": "28dcddbf2190af980ca1cd32b2d475af5d7fa52877dfc5863374f75d8cd0dd9d",
     "mod_assistant/xml_compare_ui.py": "469d8621eab5ca6f582debbbd3ee1fec6c2ffec8e587b1f1e71168b23a1249b7"
-  }
+  },
+  "approved_release_prepared_at_utc": "2026-10-05T04:34:10.134432+00:00"
 }
