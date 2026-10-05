@@ -151,7 +151,7 @@ class NetworkAndCacheTests(Fixture):
             data,_=workshop_details(self.env,['101'],force=True)
         self.assertEqual(data['101']['children'],['102'])
 
-    def test_older_mixed_case_analysis_cache_is_reused(self):
+    def test_current_mixed_case_analysis_cache_is_reused(self):
         import hashlib
         from mod_assistant.analysis_cache import encode, SCHEMA
         from mod_assistant.mod_analysis import inspect
@@ -162,8 +162,8 @@ class NetworkAndCacheTests(Fixture):
         for file in sorted(mod.source.rglob('*')):
             if file.is_file() and file.suffix.casefold() in ('.xml','.lua','.cs','.dll'):
                 stat=file.stat();rows.append((file.relative_to(mod.source).as_posix(),stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
-        legacy=hashlib.sha256(json.dumps([str(mod.source),mod.name,rows,{}],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
-        path=self.env.work/'analysis/features-v2'/ (hashlib.sha256(mod.item_id.encode()).hexdigest()+'.json')
+        legacy=hashlib.sha256(json.dumps([str(mod.source),mod.name,list(mod.aliases),rows,{}],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
+        path=self.env.work/'analysis/features-v3'/ (hashlib.sha256(mod.item_id.encode()).hexdigest()+'.json')
         path.parent.mkdir(parents=True)
         path.write_text(json.dumps({'schema':SCHEMA,'source':str(mod.source),'signature':legacy,'feature':encode(inspect(mod))}))
         with patch('mod_assistant.analysis_cache.inspect',side_effect=AssertionError('unchanged cache should be reused')):

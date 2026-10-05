@@ -1,27 +1,33 @@
-BaroDock v0.7.1
+BaroDock v0.9.0
 
-本项目是独立 Windows 64 位工具，工坊负责分发文件。
-无需在游戏中启用这个包，不要把它作为服务器必需模组。
+独立 Windows 64 位工具；工坊负责分发，不需要在游戏里启用，不要作为服务器必需模组。
+1. 运行「安装到桌面.cmd」；或把 BarotraumaModAssistant.exe 复制到自己的文件夹运行。
+2. 右上角 中文 / English 切换语言并保存。完整说明见 使用说明.md / README_EN.md。
+3. 默认本地检测；需要更新时保持 Steam 登录，关闭游戏/服务器，再主动开始更新。
+4. 主工具栏「自动排序（预览）」显示变动与原因，确认后才应用；可以拖动和撤销。
+5. 「模组管理」导入/导出游戏 ModLists XML、检查缺失项及保存/恢复完整快照。
+6. 「工具与脚本」提供 XML 定义对照、日志线索、最近错误详情及 LuaCs。
+7. 安装/更新 LuaCs 保留 C# 选择；开启、关闭和恢复 C# 设置是独立操作。
+8. 备份能打开文件夹、复制路径或选择位置；未完成副本不能自动恢复。
 
-1. 双击「安装到桌面.cmd」，只复制助手并创建桌面入口，不改游戏配置。
-2. 从桌面的「BaroDock（工坊版）」启动。
-3. 保持 Steam 登录，关闭游戏/服务器，选择模组后点击「开始并行更新」。
-4. 排序、启用、联机配置在「模组管理」；LuaCs 与日志在「工具与脚本」。
-5. 右上角「中文 / English」实时切换并保存语言；英文说明见 README_EN.md。
-6. 右上角「外观设置」可以切换主题、颜色、字号等。
-
-也可以手动复制 BarotraumaModAssistant.exe 到自己的文件夹后双击运行。
-请使用独立副本，避免运行中的工坊目录文件妨碍助手自身更新。
-工坊下载新版后，先退出旧助手，再运行「安装到桌面.cmd」覆盖桌面版。
-桌面副本保存在 %LOCALAPPDATA%\BarotraumaModAssistant\WorkshopProgram。
-卸载工坊包不会自动删除桌面副本或已保存的助手配置。
-
-查找本项目：
+工坊下载新版后，退出旧助手，再运行安装入口更新桌面副本；Steam 不自动替换独立副本。
+桌面副本：%LOCALAPPDATA%\BarotraumaModAssistant\WorkshopProgram
+卸载工坊包不会自动删除桌面副本或已保存的设置。
+工坊安装位置：
 %LOCALAPPDATA%\Daedalic Entertainment GmbH\Barotrauma\WorkshopMods\Installed\__WORKSHOP_ID__
-或 Steam 下载所在库：steamapps\workshop\content\602960\__WORKSHOP_ID__
+或下载所在库：steamapps\workshop\content\602960\__WORKSHOP_ID__
 
-完整使用方法和验证范围见「使用说明.md」。
-实际下载速度由 Steam 决定；兼容等级与排序建议仍需结合作者说明和实测。
+Standalone Windows 64-bit tool, delivered through the Workshop. Do not enable it as a gameplay mod.
+Run Install-to-desktop.cmd, or copy the executable into your own folder. No Python installation needed.
+Switch to English at the top right. Start with README_EN.md.
+Local inspection is the default. Close the game/server before changes; choose online actions explicitly.
+Auto-sort preview shows proposed changes and reasons; review and apply them yourself.
+Mod management offers native game presets, missing-item review and independent file backups.
+Tools offers XML comparisons, log clues, recent error details and LuaCs installation.
+LuaCs updates preserve the C# choice. Enable, disable and restore C# settings separately.
+After Workshop updates, close the old app and rerun the installer to update the desktop copy.
 
-默认本地检测；需要联网时主动选择。访问范围说明见 ACCESS_AND_PRIVACY.md。
-Default: local inspection. Choose online actions explicitly. See ACCESS_AND_PRIVACY.md.
+实际下载由 Steam 调度；XML 和依赖证据不保证游戏内兼容，也不是恶意软件检测。
+Steam controls downloads. Analysis is evidence for review, not a gameplay guarantee or malware scan.
+访问范围与限制见 ACCESS_AND_PRIVACY.md。分享日志前请检查个人信息，不会自动上传。
+See ACCESS_AND_PRIVACY.md. Review personal information before sharing; no logs are uploaded automatically.

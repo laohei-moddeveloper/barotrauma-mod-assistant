@@ -72,6 +72,8 @@ class MainInterface:
         app.label(header,'语言 / Language',fg=MUTED,font=('Microsoft YaHei UI',9)).pack(side='right')
         app.label(header,'v'+VERSION,fg=MUTED).pack(side='right',padx=16)
         toolbar=self.frame(app.root,padx=22,pady=2); toolbar.pack(fill='x')
+        self.sort_button=app.button(toolbar,'自动排序（预览）',lambda:app.show_order(True),primary=True)
+        self.sort_button.pack(side='left',padx=(0,10))
         app.update_button=app.button(toolbar,'开始并行更新',lambda:app.start_update(True),primary=True)
         app.update_button.pack(side='left',padx=(0,10))
         app.refresh_button=app.button(toolbar,'重新检测',app.scan,requires_game=False); app.refresh_button.pack(side='left',padx=(0,10))
@@ -172,7 +174,9 @@ class MainInterface:
         app.label(lua,textvariable=app.luacs_text,bg=PANEL,fg=MUTED,wraplength=400,justify='left').pack(anchor='w',pady=(0,14))
         app.label(lua,textvariable=app.luacs_backup_text,bg=PANEL,fg=MUTED,wraplength=400,justify='left').pack(anchor='w',pady=(0,8))
         app.button(lua,'LuaCs 恢复说明',lambda:app.text_report('LuaCs 恢复说明', RESTORE_GUIDE),busy=False).pack(anchor='w',pady=5)
-        for title,command,primary in [('一键安装 LuaCs + C#',app.install_luacs,True),
+        for title,command,primary in [('安装 / 更新 LuaCs',app.install_luacs,True),
+                                     ('单独开启 C#',lambda:app.set_csharp(True),False),('关闭 C#',lambda:app.set_csharp(False),False),
+                                     ('恢复 C# 原设置',lambda:app.restore_luacs('csharp'),False),
                                      ('安装后验证指引',app.verify_luacs,False),('恢复 LuaCs 安装前',app.restore_luacs,False)]:
             button=app.button(lua,title,command,primary)
             button.pack(anchor='w',pady=5)
@@ -180,6 +184,7 @@ class MainInterface:
                 self.restore_button=button
         checks=self.card(grid,'检查与报告','遇到问题先看日志；需要分享时可导出模组与更新信息。',1)
         for title,command in [('游戏 / LuaCs 日志诊断',app.diagnose_logs),('选择其他日志',lambda:app.diagnose_logs(choose=True)),
+                              ('最近错误详情',app.show_last_error),
                               ('完整重新分析',lambda:app.scan(force=True)),('仅同步本地缓存',lambda:app.start_update(False)),
                               ('导出兼容分析',app.export_analysis),('导出更新报告',app.export_report)]:
             app.button(checks,title,command).pack(anchor='w',pady=5)
@@ -286,7 +291,7 @@ class MainInterface:
 
     def context_menu(self,event):
         app=self.app; item=app.tree.identify_row(event.y)
-        if not item or app.worker and app.worker.is_alive(): return
+        if not item or app.task_active or app.worker and app.worker.is_alive(): return
         app.tree.selection_set(item); app.tree.focus(item)
         try: self.context.tk_popup(event.x_root,event.y_root)
         finally: self.context.grab_release()

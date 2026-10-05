@@ -12,6 +12,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 
 from .core import APP_ID, AssistantError, Cancelled, Environment, Mod, atomic_json, load_package, within, mod_files, reject_link
+from .author_rules import read_rules, applicable, rule_context
 
 
 KIND_BY_TAG = {
@@ -33,10 +34,6 @@ DEFINITION_TAGS = {"item", "structure", "character", "afflictions", "jobs", "tal
                    "levelobjectprefabs", "mapgenerationparameters", "outpostconfig", "npcsets"}
 PATH_REF = re.compile(r"%(?:Other)?ModDir:([^%]+)%", re.I)
 ADDON_NAME = re.compile(r"汉化|翻译|localization|translation|补丁|patch|addon|expansion|rebalance|整合", re.I)
-LUA_ADD = re.compile(r'\bHook\.Add\s*\(\s*[\'"]([^\'"]+)[\'"]\s*,\s*[\'"]([^\'"]+)[\'"]', re.I)
-LUA_PATCH = re.compile(r'\bHook\.Patch\s*\(\s*[\'"]([^\'"]+)[\'"]\s*,\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*[\'"]([^\'"]+)[\'"])?', re.I)
-CS_PATCH = re.compile(r'\[HarmonyPatch\s*\(\s*typeof\s*\(\s*([\w.]+)\s*\)\s*,\s*(?:nameof\s*\(\s*[\w.]+\.([\w]+)\s*\)|[\'"]([^\'"]+)[\'"])', re.I)
-LUA_GLOBAL = re.compile(r'\b((?:NTC|NT|Tsm|TSM|EHA|EW)\.[A-Za-z_]\w*)\s*=\s*(?![=])')
 PREFAB_TAGS = {
     "item": {"item"}, "structure": {"structure"}, "character": {"character"},
     "afflictions": {"affliction"}, "jobs": {"job"}, "talents": {"talent"},
@@ -58,16 +55,14 @@ class Features:
     workshop_dependencies: set[str] = field(default_factory=set)
     core: bool = False
     partial: bool = False
-    hook_names: set[tuple[str, str]] = field(default_factory=set)
-    hook_events: set[str] = field(default_factory=set)
-    patches: set[tuple[str, str]] = field(default_factory=set)
-    globals_written: set[str] = field(default_factory=set)
     code_files: int = 0
     opaque_code: int = 0
     overrides: set[tuple[str, str, str]] = field(default_factory=set)
     definition_files: dict[str, list[str]] = field(default_factory=dict)
     csharp_files: int = 0
     deferred: bool = False
+    declared_rules: list[dict] = field(default_factory=list)
+    rule_notes: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -150,10 +145,10 @@ def workshop_details(env: Environment, ids: list[str], allow_network=True, force
     return entries, available
 
 
-def _resource_path(folder: Path, name: str, own_name: str) -> Path | None:
+def _resource_path(folder: Path, name: str, own_name: str, aliases=()) -> Path | None:
     value = name.replace("\\", "/")
     for match in PATH_REF.finditer(value):
-        if match.group(1).casefold() != own_name.casefold():
+        if match.group(1).casefold() not in {value.casefold() for value in (own_name,*aliases)}:
             return None
         value = value.replace(match.group(), "%ModDir%")
     if not value.startswith("%ModDir%/"):
@@ -200,42 +195,14 @@ def _definition_info(path: Path, category: str):
     return found, overrides
 
 
-def _code_signals(folder: Path, result: Features):
+def _script_inventory(folder: Path, result: Features):
+    # Presence is a file fact. Source text cannot prove execution or conflict.
     for path in mod_files(folder):
-        if not path.is_file():
-            continue
-        if not within(path, folder) or path.is_symlink():
-            result.partial = True
-            continue
-        suffix = path.suffix.casefold()
-        if suffix == ".dll":
-            result.opaque_code += 1
-            continue
-        if suffix not in (".lua", ".cs"):
-            continue
-        result.code_files += 1
-        if suffix == ".cs": result.csharp_files += 1
-        try:
-            if path.stat().st_size > 2_000_000:
-                result.partial = True
-                continue
-            source = path.read_text(encoding="utf-8-sig", errors="replace")
-        except OSError:
-            result.partial = True
-            continue
-        # Strip only whole-line comments. The scanner deliberately stays
-        # conservative: dynamic hook arguments and generated code are unknown.
-        marker = "--" if suffix == ".lua" else "//"
-        source = "\n".join(line for line in source.splitlines()
-                           if not line.lstrip().startswith(marker))
-        result.hook_names.update((event.casefold(), name.casefold()) for event, name in LUA_ADD.findall(source))
-        result.hook_events.update(event.casefold() for event, _ in LUA_ADD.findall(source))
-        result.patches.update(((method_or_owner if named_method else owner_or_id).casefold(),
-                               (named_method or method_or_owner).casefold())
-                              for owner_or_id, method_or_owner, named_method in LUA_PATCH.findall(source))
-        result.patches.update((owner.casefold(), (named or literal).casefold())
-                              for owner, named, literal in CS_PATCH.findall(source))
-        result.globals_written.update(name.casefold() for name in LUA_GLOBAL.findall(source))
+        suffix=path.suffix.casefold()
+        if suffix=='.dll': result.opaque_code+=1
+        elif suffix in ('.lua','.cs'):
+            result.code_files+=1
+            if suffix=='.cs': result.csharp_files+=1
 
 
 def inspect(mod: Mod, metadata: dict | None = None) -> Features:
@@ -281,12 +248,12 @@ def inspect(mod: Mod, metadata: dict | None = None) -> Features:
         for element in root:
             filename = element.get("file", "")
             for dependency in PATH_REF.findall(filename):
-                if dependency.casefold() != mod.name.casefold():
+                if dependency.casefold() not in {value.casefold() for value in (mod.name,*mod.aliases)}:
                     result.path_dependencies.add(dependency)
             tag = element.tag.casefold()
             if tag not in DEFINITION_TAGS or not filename.lower().endswith(".xml"):
                 continue
-            path = _resource_path(mod.source, filename, mod.name)
+            path = _resource_path(mod.source, filename, mod.name,mod.aliases)
             if path is None:
                 result.partial = True
                 continue
@@ -301,7 +268,8 @@ def inspect(mod: Mod, metadata: dict | None = None) -> Features:
                     result.definition_files.setdefault("|".join(key), []).append(path.relative_to(mod.source).as_posix())
             except (OSError, ET.ParseError):
                 result.partial = True
-        _code_signals(mod.source, result)
+        _script_inventory(mod.source, result)
+        result.declared_rules,result.rule_notes=read_rules(mod.source)
         if result.code_files and "框架/脚本" not in result.kinds and "脚本/工具" not in result.kinds:
             result.kinds = result.kinds + ("脚本/工具",)
         return result
@@ -322,19 +290,7 @@ def luacs_runtime_detected(env: Environment) -> bool | None:
 
 def pair_evidence(left: Features, right: Features) -> tuple[int, str]:
     overlaps = left.definitions & right.definitions
-    same_names = left.hook_names & right.hook_names
-    patches = left.patches & right.patches
-    globals_written = left.globals_written & right.globals_written
     signals=[]
-    if same_names:
-        example = next(iter(sorted(same_names)))
-        signals.append((3, f"Lua Hook.Add 重复注册 {example[0]}/{example[1]}，名称可能互相覆盖"))
-    if globals_written:
-        example = next(iter(sorted(globals_written)))
-        signals.append((2, f"脚本都写入共享变量 {example}，执行顺序可能改变结果"))
-    if patches:
-        example = next(iter(sorted(patches)))
-        signals.append((2, f"脚本都修改方法 {example[0]}.{example[1]}，需核对补丁顺序"))
     if overlaps:
         example = "、".join(sorted({definition[2] for definition in overlaps})[:2])
         category = "、".join(sorted({definition[0] for definition in overlaps})[:2])
@@ -349,7 +305,9 @@ def pair_evidence(left: Features, right: Features) -> tuple[int, str]:
 def evaluate(mods: list[Mod], features: dict[str, Features],
              runtime_luacs: bool | None = None, order=None, csharp=None) -> dict[str, Assessment]:
     active = {mod.item_id for mod in mods if mod.enabled}
-    names = {feature.name.casefold(): item for item, feature in features.items()}
+    known={mod.item_id:mod for mod in mods}
+    names,ambiguous=rule_context(known)
+    context=(names,ambiguous,active|{name for name,item in names.items() if item in active})
     pair_signals = defaultdict(list)
     # Only shared facts can trigger pair_evidence. Index those facts once, rather
     # than comparing every unrelated pair. Preserve original pair iteration order.
@@ -359,7 +317,7 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
         feature = features.get(mod.item_id)
         if feature is None:
             continue
-        for kind in ('definitions', 'hook_names', 'patches', 'globals_written'):
+        for kind in ('definitions',):
             for value in getattr(feature, kind):
                 key = (kind, value)
                 for previous in index[key]:
@@ -374,7 +332,19 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
     result = {}
     for mod in mods:
         feature = features.get(mod.item_id, Features(mod.item_id, mod.name, partial=True))
-        reasons, severity = [], 0
+        reasons, severity = list(feature.rule_notes), 0
+        declared_conflicts=[]; declared_missing=[]
+        for rule in feature.declared_rules:
+            applies,target,unclear=applicable(rule,active,known,context)
+            if applies is False: continue
+            if applies is None or unclear:
+                reasons.append('metadata.xml 的条件或名称不明确，该声明未用于判断。'); continue
+            if rule['type']=='conflict' and target in active:
+                declared_conflicts.append(target)
+                reasons.append(f"本机 metadata.xml 声明与 {known[target].name} 冲突；请核对该声明是否适用于当前版本。")
+            elif rule['type'] in ('requirement','requiredAnyOrder') and target not in active and not (target=='2559634234' and runtime_luacs is True):
+                declared_missing.append(target or rule['name'])
+                reasons.append('本机 metadata.xml 声明的前置未启用：'+(target or rule['name']))
         missing = [item for item in sorted(feature.workshop_dependencies) if item not in active
                    and not (item == "2559634234" and runtime_luacs is True)]
         if missing:
@@ -382,6 +352,8 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
             reasons.append("发布者标注的依赖未启用：" + "、".join(labels[:3]))
             severity = 3
         for name in sorted(feature.path_dependencies):
+            if name.casefold() in ambiguous:
+                reasons.append('资源路径引用的名称存在多个候选，不能确认依赖：'+name); continue
             dependency = names.get(name.casefold())
             if dependency is None or dependency not in active:
                 reasons.append(f"资源路径需要另一模组：{name}（未检测到启用）")
@@ -400,21 +372,16 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
             kind = other_kinds[0] if other_kinds else "未知类型"
             reasons.append(f"与{state}的 {kind} 模组 {other.name}：{reason}")
             severity = max(severity, score)
-        if ADDON_NAME.search(mod.name):
-            matched = [other for other in mods if other.item_id != mod.item_id
-                       and len(other.name) >= 6 and other.name.casefold() in mod.name.casefold()]
-            for other in sorted(matched, key=lambda x: -len(x.name))[:1]:
-                if not other.enabled:
-                    reasons.append(f"名称显示可能配套 {other.name}，目前未启用；请核对发布者说明")
-                    severity = max(severity, 1)
         if feature.partial:
             reasons.append("部分资源未能分析，结论不完整")
         if feature.deferred:
             reasons.append("游戏运行中的轻量检测：深度扫描已延后，缓存结果可能过时")
         if feature.opaque_code:
             reasons.append("含编译后的程序库，部分内部行为无法仅凭文本资源判断")
+        if feature.code_files:
+            reasons.append('脚本仅统计文件及运行条件；未分析执行逻辑，不能据此判定脚本之间的兼容性。')
         if not reasons:
-            reasons.append(f"已与其他 {max(0, len(mods) - 1)} 个缓存模组比对资源及可读取的脚本，未发现直接重叠；仍需游戏内验证")
+            reasons.append(f"已与其他 {max(0, len(mods) - 1)} 个缓存模组比对可识别的 XML 定义，未发现直接重叠；仍需游戏内验证")
         if feature.core or "框架/脚本" in feature.kinds:
             importance = "关键组件"
         elif len(feature.definitions) > 200 or len(set(feature.kinds) & SYSTEM_KINDS) >= 2:
@@ -425,18 +392,19 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
             importance = "中"
         max_signal = max((score for score, _, _ in signals), default=0)
         active_signal = max((score for score, other, _ in signals if other.item_id in active), default=0)
-        compatibility = ("低·运行条件" if (runtime_luacs is False and feature.code_files or csharp is False and feature.csharp_files) else
-                         "低·缺前置" if missing or any("资源路径需要" in text for text in reasons) else
+        compatibility = ("低·声明冲突" if declared_conflicts else
+                         "低·缺前置" if missing or declared_missing or any("资源路径需要" in text for text in reasons) else
                          "低·当前冲突风险" if mod.enabled and active_signal >= 3 else
                          "低·潜在冲突风险" if max_signal >= 3 else
                          "中·当前重叠" if mod.enabled and active_signal >= 2 else
                          "中·潜在重叠" if max_signal >= 2 else
                          "中·需核对" if severity == 1 else
-                         "未知·资料不足" if feature.partial or feature.opaque_code else "未见直接冲突·待实测")
+                         "未知·脚本待核实" if feature.code_files else
+                         "未知·资料不足" if feature.partial or feature.opaque_code or any('不能确认依赖' in text for text in reasons) else "未见直接冲突·待实测")
         if feature.deferred: compatibility='待刷新·缓存结论'
         result[mod.item_id] = Assessment(mod.item_id, feature.kinds, importance,
                                          compatibility, reasons, max(0, len(mods) - 1), len(signals))
-        result[mod.item_id].evidence = "缓存待刷新" if feature.deferred else "资料不完整" if feature.partial or feature.opaque_code else "已读取文件事实，兼容结论仍需实测"
+        result[mod.item_id].evidence = "缓存待刷新" if feature.deferred else "资料不完整" if feature.partial or feature.opaque_code or feature.code_files else "已读取文件事实，兼容结论仍需实测"
         result[mod.item_id].pairs = [pair_detail(feature, features.get(other.item_id, Features(other.item_id, other.name)),
                                                order or [], other.item_id in active) for _, other, _ in signals]
     return result

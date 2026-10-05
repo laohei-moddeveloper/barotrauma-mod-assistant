@@ -8,6 +8,7 @@ import time
 from .core import AssistantError, Cancelled, Environment, Installer, atomic_json, game_running, scoped_game_guard
 from .steam import DOWNLOADING, PENDING, SUBSCRIBED, SteamBridge, result_text
 from .tasks import TaskCheckpoint
+from .operation_errors import describe_error
 
 
 class UpdateEngine:
@@ -38,7 +39,7 @@ class UpdateEngine:
         checkpoint = TaskCheckpoint(self.env)
         checkpoint.begin(ids, online)
         bridge = None
-        results, errors = {}, {}
+        results, errors, error_details = {}, {}, {}
         started = time.monotonic()
         if online:
             bridge = self.bridge_factory(self.env).connect()
@@ -179,6 +180,7 @@ class UpdateEngine:
                             future = pool.submit(installer.install, item, source, timestamp, self.cancel, progress)
                             futures[future] = item
                         except Exception as error:
+                            error_details[item]=describe_error(error,self.env,'更新模组')
                             errors[item] = str(error)
                             self.event(item, "失败", detail=str(error))
                     for future in list(futures):
@@ -195,11 +197,13 @@ class UpdateEngine:
                                 errors[item] = str(error)
                                 self.event(item, "已停止", detail=str(error))
                             except Exception as error:
+                                error_details[item]=describe_error(error,self.env,'更新模组')
                                 errors[item] = str(error)
                                 self.event(item, "失败", detail=str(error))
                     # The callback pump must run frequently; a short wait stays cancellable.
                     time.sleep(0.08)
             summary = {"completed": results, "errors": errors, "cancelled": self.cancel.is_set(),
+                       'error_details':error_details,
                        "seconds": round(time.monotonic() - started, 2),
                        "download_slots": self.download_slots, "install_slots": self.install_slots,
                        "online": online}

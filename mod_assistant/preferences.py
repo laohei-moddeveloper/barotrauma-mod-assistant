@@ -21,6 +21,10 @@ def normalize_preferences(value):
             raw.casefold() == 'true' if isinstance(raw, str) and raw.casefold() in ('true', 'false') else True)
     if not isinstance(result.get('game_directory', ''), str):
         result['game_directory'] = ''
+    backup=result.get('snapshot_directory','')
+    result['snapshot_directory']=backup if isinstance(backup,str) and (not backup or Path(backup).is_absolute()) else ''
+    history=result.get('snapshot_locations',[])
+    result['snapshot_locations']=list(dict.fromkeys(path for path in history if isinstance(path,str) and Path(path).is_absolute()))[:10] if isinstance(history,list) else []
     return result
 
 

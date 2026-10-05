@@ -172,11 +172,11 @@ class WorkflowUiTests(UiTests):
         picker=next(child for child in dialog.window.winfo_children() if isinstance(child,tk.Toplevel))
         next(child for child in picker.winfo_children() if isinstance(child,tk.Button)).invoke()
         self.assertEqual(dialog.ids,['101','102','104'])
-        dialog.automatic();self.assertEqual(dialog.ids,['101','102','104'])
+        dialog.automatic();self.app.worker.join(3);self.app.drain();self.assertEqual(dialog.ids,['101','102','104'])
         dialog.list.selection_clear(0,'end');dialog.list.selection_set(2);dialog.toggle_lock()
         self.assertNotIn('104',dialog.rules['locks'])
         dialog.list.selection_clear(0,'end');dialog.list.selection_set(1);dialog.remove_selected()
-        dialog.automatic();self.assertEqual(dialog.ids,['101','104'])
+        dialog.automatic();self.app.worker.join(3);self.app.drain();self.assertEqual(dialog.ids,['101','104'])
         self.assertEqual(self.config.read_bytes(),before);dialog.window.destroy()
 
     def test_list_is_visible_before_deep_analysis_starts(self):

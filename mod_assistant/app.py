@@ -7,6 +7,7 @@ from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
 import queue
+import re
 import sys
 import threading
 import time
@@ -27,13 +28,14 @@ from .analysis_cache import inspect_cached
 from .management_ui import ManagementDialog
 from .profiles import capture_profile, normalize_profile, resolve_profile
 from .snapshots import SnapshotStore
-from .diagnostics import diagnose, recent_logs, lua_verification
+from .diagnostics import diagnose, recent_logs, lua_verification, redact
+from .operation_errors import describe_error, operation_name
 from .steam import BUSY, DOWNLOADING, NEEDS_UPDATE, PENDING, SteamBridge
 from .appearance import Appearance
 from .main_ui import MainInterface
 from .i18n import Localizer, Dialogs, LANGUAGES
 from .preferences import load_preferences
-from .access import access_report, NETWORK_NOTICE, LUACS_NOTICE
+from .access import access_report, NETWORK_NOTICE, LUACS_NOTICE, CSHARP_NOTICE
 from .tasks import TaskCheckpoint
 
 STATE = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "BarotraumaModAssistant"
@@ -49,6 +51,7 @@ class App:
         self.root.report_callback_exception = self.callback_error
         self.events = queue.Queue()
         self.worker = None
+        self.task_active=False
         self.engine = None
         self.cancel = threading.Event()
         self.mods = {}
@@ -62,8 +65,10 @@ class App:
         self.env = None
         self.config_ready = True
         self.scan_timings = {}
+        self.analysis_stats={'reused':0,'scanned':0,'deferred':0}
         self.stage_log = {}
         self.last_summary = None
+        self.last_error_report=None
         self.refresh_after_idle = False
         startup_warnings = []
         self.settings_writable = True
@@ -204,8 +209,12 @@ class App:
         self.logs.configure(state="disabled")
 
     def callback_error(self, error_type, error, trace):
-        self.logger.error("界面操作失败", exc_info=(error_type, error, trace))
-        self.dialogs.showerror("操作未完成", str(error), parent=self.root)
+        self.report_error(error,'界面操作',''.join(traceback.format_exception(error_type,error,trace)))
+
+    def report_error(self,error,operation='助手操作',trace=None):
+        self.logger.error('%s',operation,exc_info=(type(error),error,error.__traceback__))
+        self.last_error_report=describe_error(error,self.env,operation,trace)
+        self.dialogs.showerror('操作未完成',self.last_error_report['summary'],parent=self.root)
 
     def verified_fingerprint(self, item):
         receipt = self.env.work / "receipts" / (item + ".json")
@@ -217,6 +226,7 @@ class App:
         return data.get("fingerprint", "")
 
     def set_busy(self, busy):
+        self.task_active=bool(busy)
         self.busy_buttons = [button for button in self.busy_buttons if button.winfo_exists()]
         for button in self.busy_buttons:
             button.configure(state="disabled" if busy or (getattr(button, '_requires_game', False) and (not self.env or not self.config_ready)) else "normal")
@@ -229,7 +239,7 @@ class App:
         self.interface.restore_button.configure(state='normal' if info and info.available and not busy and self.config_ready else 'disabled')
 
     def changes_allowed(self):
-        if self.worker and self.worker.is_alive():
+        if self.task_active or self.worker and self.worker.is_alive():
             return False
         if not self.env or not self.config_ready:
             self.environment_help()
@@ -254,10 +264,11 @@ class App:
         self.text_report('首次使用与环境检查', '\n'.join(lines))
 
     def work(self, function):
-        if self.worker is not None and self.worker.is_alive():
+        if self.task_active or self.worker is not None and self.worker.is_alive():
             return
         self.cancel.clear()
         self.set_busy(True)
+        operation=operation_name(function)
 
         def run():
             try:
@@ -266,9 +277,8 @@ class App:
                 self.events.put({'kind':'scan_status','message':'助手任务已停止；已读取的清单仍可浏览。'})
             except Exception as error:
                 self.logger.error("%s\n%s", error, traceback.format_exc())
-                message = ('无法访问或写入所需文件；请检查目录权限和文件占用，关闭游戏后重试。'
-                           if isinstance(error, PermissionError) else str(error))
-                self.events.put({"kind": "error", "message": message})
+                report=describe_error(error,self.env,operation)
+                self.events.put({'kind':'error','message':report['summary'],'report':report})
             finally:
                 self.events.put({"kind": "idle"})
 
@@ -291,6 +301,9 @@ class App:
         def detect():
             started = time.monotonic()
             env = discover(self.settings.get("game_directory", ""))
+            if self.settings.get('snapshot_directory'):
+                env.snapshot_root=Path(self.settings['snapshot_directory'])
+            env.snapshot_history=tuple(Path(path) for path in self.settings.get('snapshot_locations',[]))
             saved_game = self.settings.get('game_directory', '')
             if saved_game and Path(saved_game).resolve() != env.game.resolve():
                 self.events.put({'kind':'log', 'message':'保存的游戏目录已失效，已改用 Steam 当前安装目录。'})
@@ -399,8 +412,30 @@ class App:
         content=tk.Text(panel,bg=PANEL,fg=TEXT,wrap='word',relief='flat',padx=12,pady=12,
                         font=('Microsoft YaHei UI',10),yscrollcommand=scrollbar.set)
         content.pack(fill='both',expand=True); scrollbar.configure(command=content.yview)
+        def workshop_links():
+            for tag in content.tag_names():
+                if tag.startswith('workshop-link-'): content.tag_delete(tag)
+            for number,match in enumerate(re.finditer(r'https://steamcommunity\.com/sharedfiles/filedetails/\?id=([1-9][0-9]{0,19})\b',content.get('1.0','end'))):
+                if int(match[1])>=2**64: continue
+                url='https://steamcommunity.com/sharedfiles/filedetails/?id='+match[1]
+                tag='workshop-link-'+str(number)
+                content.tag_add(tag,f'1.0+{match.start()}c',f'1.0+{match.end()}c')
+                content.tag_configure(tag,foreground=self.appearance.colours['accent_text'],underline=True)
+                content.tag_bind(tag,'<Button-1>',lambda event,value=url:webbrowser.open(value))
+                content.tag_bind(tag,'<Enter>',lambda event:content.configure(cursor='hand2'))
+                content.tag_bind(tag,'<Leave>',lambda event:content.configure(cursor='xterm'))
+        content._after_text_refresh=workshop_links
         self.locale.bind_text(content, text, [data["mod"].name for data in self.mods.values()]); content.configure(state='disabled')
         self.skin(dialog)
+        return dialog
+
+    def show_last_error(self):
+        if self.last_error_report is None:
+            self.dialogs.showinfo('最近错误详情','本次运行尚未记录错误。',parent=self.root); return
+        report=self.last_error_report
+        self.text_report('错误详情（本地）','\n'.join([report['summary'],'BaroDock '+report['version'],
+                         '具体错误：'+report['cause'],'技术详情（已隐藏已知个人目录和凭据字段）：',report['details'],
+                         '请先检查内容，再自行选择是否分享；此窗口不会上传。']))
 
     def diagnose_logs(self,choose=False):
         if not self.env: return
@@ -411,11 +446,14 @@ class App:
         summary=self.last_summary
         def work():
             report=diagnose(path,mods,self.env)
-            lines=[report['file'],report['note'],'']
+            lines=[report['file'],redact(report['path'],self.env),'日志修改时间（UTC）：'+report['modified_utc'],
+                   f"读取起始字节：{report['byte_offset']} · {report['encoding']}",report['note'],'']
+            if report['changed_during_read']: lines.append('日志在读取期间发生变化；可重新选择最新日志再检查。')
             if summary and summary.get('errors'):
                 lines+=['最近助手更新未完成项：']+[f'{item}：{error}' for item,error in summary['errors'].items()]+['']
             for finding in report['findings']:
-                lines += [f"[{finding['category']}] 片段行 {finding['line_in_tail']}",finding['evidence'],
+                position=f"全文行 {finding['line_in_file']}" if finding['line_in_file'] is not None else f"片段行 {finding['line_in_tail']}"
+                lines += ['['+finding['category']+'] '+position,finding['evidence'],
                           '可能相关模组：'+('、'.join(finding['possible_mods']) or '未确定'),finding['text'],
                           '建议：'+finding['advice'],'']
             if not report['findings']: lines.append('读取片段未发现已识别的错误关键词；这不代表游戏运行无错误。')
@@ -486,11 +524,11 @@ class App:
     def click_checkbox(self, event):
         item = self.tree.identify_row(event.y)
         if item and self.tree.identify_column(event.x) == "#2":
-            if not (self.worker and self.worker.is_alive()):
+            if not self.task_active and not (self.worker and self.worker.is_alive()):
                 self.toggle_item(item)
             return "break"
         if item and self.tree.identify_column(event.x) == "#1":
-            if self.worker and self.worker.is_alive():
+            if self.task_active or self.worker and self.worker.is_alive():
                 return "break"
             if not item.isdecimal():
                 return "break"
@@ -502,7 +540,7 @@ class App:
             return "break"
 
     def toggle_highlight(self, event=None):
-        if self.worker and self.worker.is_alive():
+        if self.task_active or self.worker and self.worker.is_alive():
             return "break"
         for item in self.tree.selection():
             if item in self.selected:
@@ -565,19 +603,20 @@ class App:
                  "兼容等级：" + assessment.compatibility,
                  '证据状态：'+assessment.evidence,
                  f"已比对 {assessment.compared} 个其他模组，其中 {assessment.risky_pairs} 对存在可解释的重叠信号。",
-                 f"资源定义：{len(feature.definitions)} 个；Lua/C# 源文件：{feature.code_files} 个；"
-                 f"识别到的方法补丁：{len(feature.patches)} 个；Hook.Add：{len(feature.hook_names)} 个。",
+                 f"资源定义：{len(feature.definitions)} 个；Lua/C# 源文件：{feature.code_files} 个。",
                  ""]
         lines += [f"{number}. {reason}" for number, reason in enumerate(assessment.reasons, 1)]
         for pair in assessment.pairs:
             lines += ['', '与 '+pair['other_name']+'：'+pair['reason'], '依据：'+pair['evidence'], '处理建议：'+pair['advice']]
             for location in pair['locations']:
                 lines.append(f"  {location['category']}/{location['identifier']} · 本模组 {', '.join(location['left_files']) or '未知路径'} · 对方 {', '.join(location['right_files']) or '未知路径'}")
-        lines += ["", "这是静态风险筛查。相同标识或方法补丁也可能是作者有意配合；最终仍需按作者说明设置顺序并在游戏内测试。"]
+        lines += ["", "这是 XML 定义和依赖声明的检查；脚本执行逻辑未分析。相同标识可能是作者有意覆盖，请结合作者说明和游戏日志核实。"]
         dialog = tk.Toplevel(self.root)
         dialog.title("模组分析 · " + mod.name)
         dialog.geometry("800x600")
         dialog.configure(bg=BG)
+        from .xml_compare_ui import XMLCompareDialog
+        self.button(dialog,'查看 XML 覆盖对照',lambda:XMLCompareDialog(self,item),busy=True).pack(anchor='w',padx=15,pady=(12,0))
         panel = tk.Frame(dialog, bg=BG, padx=15, pady=15)
         panel.pack(fill="both", expand=True)
         scrollbar = ttk.Scrollbar(panel)
@@ -610,9 +649,9 @@ class App:
                          'evidence':assessment.evidence, 'pair_details':assessment.pairs,
                          "compared": assessment.compared, "overlapping_pairs": assessment.risky_pairs,
                          "xml_definitions": len(feature.definitions), "code_files": feature.code_files,
-                         "method_patches": len(feature.patches), "hook_registrations": len(feature.hook_names),
+                         "declared_dependencies": feature.declared_rules,
                          "unreadable_libraries": feature.opaque_code, "partial": feature.partial})
-        atomic_json(Path(path), self.locale.report({"schema": "barotrauma-mod-analysis-v1",
+        atomic_json(Path(path), self.locale.report({"schema": "barotrauma-mod-analysis-v2",
                                  "note": "静态风险筛查；需要结合模组作者说明、加载顺序和游戏内测试。",
                                  "runtime_luacs_detected": self.runtime_luacs, "mods": rows}))
         self.log("已导出全部模组的兼容分析。")
@@ -624,44 +663,57 @@ class App:
             return
         self.toggle_item(highlighted[0])
 
-    def show_order(self):
+    def show_order(self, automatic=False):
         if not self.changes_allowed():
             return
-        OrderDialog(self)
+        dialog=OrderDialog(self)
+        if automatic: self.root.after(50,dialog.automatic)
 
     def install_luacs(self):
         if not self.changes_allowed():
             return
         if not self.dialogs.askyesno('LuaCs 与脚本权限说明', LUACS_NOTICE, parent=self.root):
             return
-        self.status.set("正在准备 LuaCs 安装与 C# 设置…")
+        self.status.set('正在准备 LuaCs 官方补丁安装，C# 设置保持原选择…')
         def install():
             installer = LuaCsInstaller(self.env, lambda message: self.events.put(
                 {"kind": "scan_status", "message": message}))
             installer.cancel = self.cancel
-            result = installer.install()
+            result = installer.install(refresh=True)
             detected = luacs_status(self.env)
             self.events.put({"kind": "luacs_ready", "result": result,
                              "status": detected.text, "runtime": detected.runtime, 'csharp':detected.csharp})
         self.work(install)
 
-    def restore_luacs(self):
+    def set_csharp(self,enabled):
+        if not self.changes_allowed(): return
+        notice=CSHARP_NOTICE if enabled else '只关闭 LuaCs 的永久 C# 开关，并备份原设置；依赖 C# 的模组可能失去功能。是否关闭？'
+        if not self.dialogs.askyesno('C# 脚本设置',notice,parent=self.root): return
+        def configure():
+            installer=LuaCsInstaller(self.env,lambda message:self.events.put({'kind':'scan_status','message':message}))
+            installer.cancel=self.cancel; result=installer.set_csharp(enabled)
+            detected=luacs_status(self.env)
+            self.events.put({'kind':'luacs_ready','result':result,'status':detected.text,'runtime':detected.runtime,'csharp':detected.csharp})
+        self.work(configure)
+
+    def restore_luacs(self, operation='runtime'):
         if not self.changes_allowed():
             return
-        info = restore_info(self.env)
+        info = restore_info(self.env,operation)
         if not info.available:
             self.refresh_luacs_restore()
             self.text_report('LuaCs 恢复说明', info.text + '\n\n' + RESTORE_GUIDE)
             return
+        if not self.dialogs.askyesno('确认恢复 LuaCs 范围',f"将恢复助手记录中的 {len(info.journal['records'])} 个文件。备份位置：{info.journal['backup']}\n恢复前会核对当前文件和备份指纹。",parent=self.root): return
         def restore():
             installer = LuaCsInstaller(self.env)
             installer.cancel = self.cancel
-            installer.restore()
+            installer.restore(operation)
             detected = luacs_status(self.env)
             self.events.put({"kind": "luacs_ready", "runtime": detected.runtime,
                              'csharp':detected.csharp,
                              "status": detected.text, "result": {
-                                 "message": "已恢复 LuaCs 安装前的文件与设置", "backup": ""}})
+                                 "message": '已恢复最近一次 C# 设置备份' if operation=='csharp' else "已恢复 LuaCs 安装前的文件与设置", "backup": ""}})
         self.work(restore)
 
     def arrange_mods(self, ids):
@@ -962,7 +1014,8 @@ class App:
             elif kind == 'operation_done':
                 result=event['result']; self.log(result.get('message','快照恢复完成；下次启动游戏生效'))
                 if result.get('snapshot'): self.log('恢复点：'+result['snapshot'])
-                if result.get('backup'): self.log('原文件已备份：'+result['backup'])
+                for backup in result.get('backups') or ([result['backup']] if result.get('backup') else []):
+                    self.log('原文件已备份：'+backup)
                 self.refresh_after_idle=True
             elif kind == "item":
                 item = event["id"]
@@ -977,18 +1030,22 @@ class App:
                         package = load_package(self.env.installed / item)
                         mod.mod_version = package.get("modversion", "")
                         mod.installed_version = mod.mod_version
-                        mod.name = package.get("name", mod.name)
+                        from .core import package_names
+                        mod.name, mod.aliases = package_names(package, mod.name)
                         mod.size = self.env.record(item).get("size", mod.size)
                     changed = True
             elif kind == "log":
                 self.log(event["message"])
             elif kind == "error":
+                self.last_error_report=event.get('report',self.last_error_report)
                 self.status.set("任务未完成：" + event["message"])
                 self.log(event["message"])
                 self.dialogs.showerror("任务未完成", event["message"], parent=self.root)
             elif kind == "summary":
                 self.last_summary = event["summary"]
                 summary = self.last_summary
+                if summary.get('error_details'):
+                    self.last_error_report = next(reversed(summary['error_details'].values()))
                 self.status.set(f'完成 {len(summary["completed"])} 个 · 未完成 {len(summary["errors"])} 个 · '
                                 f'耗时 {summary["seconds"]:.1f} 秒' + (" · 已停止" if summary["cancelled"] else ""))
                 self.log(self.status.get())
@@ -1033,7 +1090,7 @@ def self_check(report_path):
     started = time.monotonic()
 
     def finish():
-        if app.env is not None and not (app.worker and app.worker.is_alive()):
+        if app.env is not None and not app.task_active and not (app.worker and app.worker.is_alive()):
             appearance_checks = []
             language_checks = []
             dropdown_checks = []
@@ -1044,7 +1101,7 @@ def self_check(report_path):
                 assert len(app.assessments) == len(app.mods)
                 assert all(assessment.compared == len(app.mods) - 1
                            for assessment in app.assessments.values())
-                assert any(item.startswith("local:") for item in app.mods)
+                assert app.interface.sort_button.cget('text')==app.tr('自动排序（预览）')
                 app.select_none()
                 assert not app.selected
                 app.select_all()

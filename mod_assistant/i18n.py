@@ -174,6 +174,8 @@ class Localizer:
         if position:
             widget.yview_moveto(position[0])
         widget.configure(state=state)
+        after_refresh=getattr(widget,'_after_text_refresh',None)
+        if after_refresh: after_refresh()
 
     def localize(self, window):
         def update(widget, key, current, setter):
@@ -226,7 +228,8 @@ class Localizer:
             if isinstance(widget, tk.Button):
                 siblings = sum(isinstance(child,tk.Button) for child in widget.master.winfo_children())
                 horizontal = widget.winfo_manager() == 'pack' and widget.pack_info().get('side') in ('left', 'right')
-                widget.configure(wraplength=(100 if siblings>=5 and horizontal else 180) if self.language=='en' else 0)
+                width=getattr(widget,'_language_wraplength',100 if siblings>=5 and horizontal else 180)
+                widget.configure(wraplength=width if self.language=='en' else 0)
             for child in widget.winfo_children():
                 walk(child)
         walk(window)

@@ -7,9 +7,9 @@ import xml.etree.ElementTree as ET
 from .core import AssistantError, Cancelled, atomic_json, load_package, within, mod_files
 from .mod_analysis import Features, KIND_BY_TAG, inspect
 
-SCHEMA = 2
-SETS = {'definitions','overrides','path_dependencies','workshop_dependencies','hook_names','hook_events','patches','globals_written'}
-TUPLE_SETS = {'definitions','overrides','hook_names','patches'}
+SCHEMA = 3
+SETS = {'definitions','overrides','path_dependencies','workshop_dependencies'}
+TUPLE_SETS = {'definitions','overrides'}
 
 def encode(feature):
     data = asdict(feature)
@@ -34,6 +34,11 @@ def decode(data):
     locations=data.get('definition_files',{})
     if not isinstance(locations,dict) or any(not isinstance(k,str) or not isinstance(v,list) or any(not isinstance(x,str) for x in v) for k,v in locations.items()):
         raise ValueError('无效分析缓存文件位置')
+    rules=data.get('declared_rules',[])
+    if not isinstance(rules,list) or len(rules)>1000 or any(not isinstance(rule,dict) or rule.get('type') not in ('patch','requirement','requiredAnyOrder','conflict') or any(not isinstance(rule.get(key),str) or len(rule[key])>2000 for key in ('id','name','condition','source')) for rule in rules):
+        raise ValueError('Invalid cached dependency declarations')
+    notes=data.get('rule_notes',[])
+    if not isinstance(notes,list) or any(not isinstance(note,str) for note in notes): raise ValueError('Invalid cached declaration notes')
     valid = {f.name for f in fields(Features)}
     result = {k:v for k,v in data.items() if k in valid}
     for key in SETS:
@@ -56,13 +61,13 @@ def signature(mod, metadata, cancel=None):
             rows.append(('unsafe-or-unreadable',0,0,0))
     # Match the existing Path ordering, including Windows case folding, so
     # optimization does not invalidate unchanged caches from earlier versions.
-    value = [str(mod.source),mod.name,sorted(rows,key=lambda row:Path(row[0])),metadata]
+    value = [str(mod.source),mod.name,list(mod.aliases),sorted(rows,key=lambda row:Path(row[0])),metadata]
     return hashlib.sha256(json.dumps(value,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
 
 def inspect_cached(env, mods, metadata=None, light=False, force=False, cancel=None, emit=lambda message: None,
                    on_feature=lambda item, feature: None):
     metadata = metadata or {}
-    folder = env.work / 'analysis/features-v2'
+    folder = env.work / 'analysis/features-v3'
     results = {}; stats = {'reused':0,'scanned':0,'deferred':0}
     for mod in mods:
         if cancel and cancel.is_set(): raise Cancelled('分析已停止')

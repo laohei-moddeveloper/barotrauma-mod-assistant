@@ -201,6 +201,8 @@ class Environment:
     game: Path
     libraries: list[Path]
     player: Path
+    snapshot_root: Path | None = None
+    snapshot_history: tuple[Path, ...] = ()
 
     @property
     def installed(self):
@@ -311,7 +313,7 @@ def load_package(folder: Path) -> ET.Element:
         root = ET.parse(folder / "filelist.xml").getroot()
     except (OSError, ET.ParseError) as error:
         raise AssistantError(f"模组清单损坏或缺失：{error}") from error
-    if root.tag.lower() != "contentpackage" or not root.get("name", "").strip():
+    if root.tag.lower() != "contentpackage" or not (root.get("name", "").strip() or any(value.strip() for value in root.get('altnames','').split(','))):
         raise AssistantError("模组清单缺少 contentpackage 或名称")
     return root
 
@@ -346,6 +348,11 @@ class Mod:
     enabled: bool = False
     installed_version: str = ""
     claimed_hash: str = ""
+    aliases: tuple[str, ...] = ()
+
+def package_names(package,fallback):
+    aliases=tuple(dict.fromkeys(value.strip() for value in package.get('altnames','').split(',') if value.strip()))
+    return package.get('name','').strip() or (aliases[0] if aliases else fallback),aliases
 
 
 def inventory(env: Environment, read_config=True) -> list[Mod]:
@@ -366,7 +373,7 @@ def inventory(env: Environment, read_config=True) -> list[Mod]:
         mod = Mod(item_id, item_id, source, enabled=item_id in enabled)
         try:
             root = load_package(source or env.installed/item_id)
-            mod.name = root.get("name", item_id)
+            mod.name,mod.aliases=package_names(root,item_id)
             mod.mod_version = root.get("modversion", "")
             mod.game_version = root.get("gameversion", "")
             mod.claimed_hash = root.get("expectedhash", "")
@@ -375,7 +382,7 @@ def inventory(env: Environment, read_config=True) -> list[Mod]:
             target = env.installed / item_id
             if target.is_dir():
                 destination = load_package(target)
-                mod.name = destination.get('name',mod.name)
+                mod.name,mod.aliases=package_names(destination,mod.name)
                 mod.installed_version = destination.get("modversion", "")
                 current_time = int(destination.get("installtime", 0))
                 mod.status = "已安装 / 无 Steam 缓存" if source is None else "已安装 / 待联网核对" if (
@@ -398,7 +405,7 @@ def inventory(env: Environment, read_config=True) -> list[Mod]:
                 mod = Mod(item, folder.name, folder, enabled=item in enabled)
                 try:
                     package = load_package(folder)
-                    mod.name = package.get("name", folder.name)
+                    mod.name,mod.aliases=package_names(package,folder.name)
                     mod.mod_version = package.get("modversion", "")
                     mod.installed_version = mod.mod_version
                     mod.game_version = package.get("gameversion", "")

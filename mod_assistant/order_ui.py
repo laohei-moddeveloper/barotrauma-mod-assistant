@@ -1,11 +1,12 @@
 """A draggable preview of the actual enabled regular-package order."""
 import tkinter as tk
 import json
+import copy
 from pathlib import Path
 from tkinter import messagebox, ttk
 
 from .mod_order import read_order, suggest_order, load_rules, save_rules, validate_order, check_rules
-from .core import atomic_json, AssistantError
+from .core import atomic_json, AssistantError, Cancelled
 from .drafts import commit_draft
 from .profiles import installed_path
 
@@ -21,6 +22,7 @@ class OrderDialog:
         self.undo_stack, self.redo_stack = [], []
         self.rules = load_rules(app.env)
         self.last_reasons = []
+        self.last_movements=[]; self.computing=False; self.controls=[]
         self.drag_index = None
         self.window = tk.Toplevel(app.root)
         self.window.title("模组加载顺序")
@@ -51,22 +53,27 @@ class OrderDialog:
         note_label.pack(fill="x", padx=20)
         buttons = tk.Frame(self.window, bg="#0b1422")
         buttons.pack(fill="x", padx=20, pady=(8, 16))
-        for title, command in [("自动排序", self.automatic), ("上移", lambda: self.move(-1)),
+        for index,(title, command) in enumerate([("自动排序（预览）", self.automatic), ("上移", lambda: self.move(-1)),
                                ("下移", lambda: self.move(1)), ("锁定/解锁", self.toggle_lock),
-                               ("前后规则", self.edit_rules), ("应用草稿", self.save)]:
-            app.button(buttons, title, command, primary=title=="应用草稿", busy=False).pack(
-                side="left", padx=(0, 10))
+                               ("前后规则", self.edit_rules), ("应用草稿", self.save)]):
+            button=app.button(buttons,title,command,primary=title in ('自动排序（预览）','应用草稿'),busy=False)
+            button.grid(row=index//3,column=index%3,sticky='ew',padx=(0,8),pady=3); self.controls.append(button)
+        for column in range(3): buttons.columnconfigure(column,weight=1)
         extra = tk.Frame(self.window, bg='#0b1422')
         extra.pack(fill='x', padx=20, pady=(0,10))
-        for title,command in [('查看排序依据',self.explain),('导入排序规则',self.import_rules),('导出排序规则',self.export_rules)]:
-            app.button(extra,title,command,busy=False).pack(side='left',padx=(0,10))
+        for index,(title,command) in enumerate([('查看差异与依据',self.explain),('导入排序规则',self.import_rules),('导出排序规则',self.export_rules)]):
+            button=app.button(extra,title,command,busy=False)
+            button.grid(row=0,column=index,sticky='ew',padx=(0,8),pady=3); self.controls.append(button)
+        for column in range(3): extra.columnconfigure(column,weight=1)
         edit = tk.Menubutton(extra,text='编辑草稿 ▾',relief='flat',padx=12,pady=6)
         menu = tk.Menu(edit,tearoff=False)
         for title,command in [('添加已安装模组',self.add_installed),('停用选中模组',self.remove_selected),
                               ('撤销',lambda:self.history(False)),('重做',lambda:self.history(True)),
                               ('放弃草稿修改',self.reset_draft)]:
             menu.add_command(label=title,command=command)
-        edit.configure(menu=menu); edit.pack(side='left')
+        edit.configure(menu=menu); edit.grid(row=1,column=0,sticky='ew',padx=(0,8),pady=3); self.controls.append(edit)
+        self.cancel_button=app.button(extra,'取消计算',lambda:app.cancel.set(),busy=False)
+        self.cancel_button.grid(row=1,column=1,sticky='ew',padx=(0,8),pady=3); self.cancel_button.configure(state='disabled')
         # Reserve actions before assigning the remaining space to the list.
         # Otherwise English at a larger font can push the draft menu offscreen.
         extra.pack_configure(side='bottom',before=panel)
@@ -74,6 +81,10 @@ class OrderDialog:
         note_label.pack_configure(side='bottom',before=panel)
         self.window.bind('<Control-z>',lambda event:self.history(False))
         self.window.bind('<Control-y>',lambda event:self.history(True))
+        def close():
+            if self.computing: app.cancel.set()
+            self.window.destroy()
+        self.window.protocol('WM_DELETE_WINDOW',close)
         self.window._language_refresh = lambda: self.render(self.list.curselection()[0] if self.list.curselection() else None)
         self.render()
         app.skin(self.window)
@@ -91,9 +102,11 @@ class OrderDialog:
             self.list.see(selected)
 
     def drag_start(self, event):
+        if self.computing: return
         self.drag_index = self.list.nearest(event.y) if self.ids else None
 
     def drag_move(self, event):
+        if self.computing: return
         if self.drag_index is None:
             return
         if event.y < 0:
@@ -113,6 +126,7 @@ class OrderDialog:
         self.try_move(index,target)
 
     def try_move(self,index,target):
+        if self.computing: return False
         candidate=list(self.ids); candidate.insert(target,candidate.pop(index))
         try: validate_order(candidate,self.original,self.rules)
         except Exception as error:
@@ -124,6 +138,7 @@ class OrderDialog:
         self.redo_stack.clear()
 
     def history(self, redo=False):
+        if self.computing: return
         source,target = (self.redo_stack,self.undo_stack) if redo else (self.undo_stack,self.redo_stack)
         if not source:return
         try:validate_order(source[-1],self.original,self.rules)
@@ -132,10 +147,12 @@ class OrderDialog:
         self.note.set('草稿已修改；游戏配置尚未改变。')
 
     def reset_draft(self):
+        if self.computing: return
         self.remember();self.ids=list(self.original);self.render()
         self.note.set('已恢复打开窗口时的草稿；游戏配置尚未改变。')
 
     def remove_selected(self):
+        if self.computing: return
         selection=self.list.curselection()
         if not selection:return
         item=self.ids[selection[0]]
@@ -148,6 +165,7 @@ class OrderDialog:
         self.note.set('草稿已修改；游戏配置尚未改变。')
 
     def add_installed(self):
+        if self.computing: return
         from .core import load_package
         candidates=[]
         for item,data in self.app.mods.items():
@@ -173,6 +191,7 @@ class OrderDialog:
         window.protocol('WM_DELETE_WINDOW',close);self.app.skin(window)
 
     def toggle_lock(self):
+        if self.computing: return
         selected=self.list.curselection()
         if not selected: return
         item=self.ids[selected[0]]
@@ -185,6 +204,7 @@ class OrderDialog:
         self.render(selected[0]); self.note.set('锁定规则已保存；锁定项在本次排序中保持已保存的位置。')
 
     def edit_rules(self):
+        if self.computing: return
         window=tk.Toplevel(self.window); window.title('自定义前后规则'); window.geometry('740x490')
         window.configure(bg='#0b1422'); window.transient(self.window); window.grab_set()
         rule_ids=list(self.ids)
@@ -225,29 +245,51 @@ class OrderDialog:
         window.protocol('WM_DELETE_WINDOW',close); refresh(); self.app.skin(window)
 
     def automatic(self):
-        try:
-            # Draft operations already validate saved lock positions. Keep added
-            # and disabled entries when generating a suggestion for this draft.
-            result = suggest_order(self.ids, {item: data["mod"] for item, data in self.app.mods.items()},
-                                   self.app.features,self.rules)
-            validate_order(result.ids,self.original,self.rules)
-            self.remember(); self.ids = result.ids
-            self.last_reasons = result.reasons
-            self.note.set("；".join(result.reasons[:2]) + "。全部依据已记入主窗口日志，可继续拖动调整。")
-            for reason in result.reasons:
-                self.app.log("排序建议：" + reason)
+        if self.computing or self.app.task_active or self.app.worker and self.app.worker.is_alive(): return
+        ids=list(self.ids); rules=copy.deepcopy(self.rules)
+        mods={item:data['mod'] for item,data in self.app.mods.items()}; features=dict(self.app.features)
+        self.computing=True
+        for control in self.controls: control.configure(state='disabled')
+        self.list.configure(state='disabled'); self.cancel_button.configure(state='normal')
+        self.note.set('正在计算排序预览；可以取消，游戏配置尚未改变。')
+        def finish(result,error):
+            if not self.window.winfo_exists(): return
+            self.computing=False
+            for control in self.controls: control.configure(state='normal')
+            self.list.configure(state='normal'); self.cancel_button.configure(state='disabled')
+            if isinstance(error,Cancelled) or self.app.cancel.is_set():
+                self.note.set('排序计算已取消，草稿和游戏配置未改动'); return
+            if error:
+                self.note.set(str(error)); self.app.report_error(error,'生成排序预览'); return
+            if ids!=self.ids or rules!=self.rules or (self.app.env.game/'config_player.xml').read_bytes()!=self.baseline:
+                self.note.set('计算期间配置或草稿变化，请重新打开预览；本次建议未应用。'); return
+            self.remember(); self.ids=result.ids; self.last_reasons=result.reasons; self.last_movements=result.movements
+            self.note.set(f'已生成预览，{len(result.movements)} 个位置变化。点击“查看差异与依据”核对，游戏配置尚未改变。')
             self.render()
-        except Exception as error:
-            self.app.dialogs.showerror("无法自动排序", str(error), parent=self.window)
+        def compute():
+            result=None; error=None
+            try:
+                result=suggest_order(ids,mods,features,rules,self.app.cancel)
+                validate_order(result.ids,self.original,rules)
+            except Exception as caught: error=caught
+            finally: self.app.events.put({'kind':'ui_callback','callback':lambda:finish(result,error)})
+        self.app.work(compute)
 
     def explain(self):
         names=lambda ids: '\n'.join(f'{number}. {self.app.mods[item]["mod"].name} [{item}]' for number,item in enumerate(ids,1))
         text='\n\n'.join(['已保存的顺序',names(self.original),'当前预览（尚未保存）',names(self.ids),
+                         '位置变化', '\n'.join(f"{self.app.mods[row['id']]['mod'].name} [{row['id']}]  {row['from']} → {row['to']}\n"+'\n'.join(row['reasons']) for row in self.last_movements) or '自动排序没有移动任何模组。',
                          '排序依据', '\n'.join(self.last_reasons) or '尚未生成自动排序建议。',
                          '规则只描述模组之间的顺序，不执行代码；导入和导出均为本地文件，不自动上传。'])
-        self.app.text_report('排序预览与依据',text)
+        report=self.app.text_report('排序预览与依据',text)
+        report.transient(self.window); report.grab_set()
+        def close_report():
+            report.destroy()
+            if self.window.winfo_exists(): self.window.grab_set()
+        report.protocol('WM_DELETE_WINDOW',close_report)
 
     def import_rules(self):
+        if self.computing: return
         path=self.app.files.askopenfilename(title='导入排序规则',filetypes=[('JSON','*.json')],parent=self.window)
         if not path:return
         try:
@@ -274,6 +316,7 @@ class OrderDialog:
             self.app.dialogs.showerror('规则无法应用',str(error),parent=self.window)
 
     def save(self):
+        if self.computing: return
         ids = list(self.ids)
         if not self.app.dialogs.askyesno('应用模组草稿',
                 '将保存草稿中的启用列表和加载顺序，并备份原配置。核心内容包保持当前选择。是否应用？',parent=self.window):return

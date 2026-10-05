@@ -9,6 +9,15 @@ from .core import APP_ID, AssistantError, Environment
 
 SUBSCRIBED, INSTALLED, NEEDS_UPDATE, DOWNLOADING, PENDING = 1, 4, 8, 16, 32
 BUSY = NEEDS_UPDATE | DOWNLOADING | PENDING
+ALLOWED_EXPORTS=frozenset({
+    'SteamAPI_Shutdown','SteamAPI_InitFlat','SteamAPI_SteamUGC_v020','SteamAPI_SteamUtils_v010',
+    'SteamAPI_ISteamUtils_IsAPICallCompleted','SteamAPI_ISteamUtils_GetAppID',
+    'SteamAPI_ISteamUGC_GetItemState','SteamAPI_ISteamUGC_DownloadItem',
+    'SteamAPI_ISteamUGC_GetItemDownloadInfo','SteamAPI_ISteamUGC_GetItemInstallInfo',
+    'SteamAPI_ISteamUGC_GetNumSubscribedItems','SteamAPI_ISteamUGC_GetSubscribedItems',
+    'SteamAPI_GetHSteamPipe','SteamAPI_ManualDispatch_Init','SteamAPI_ManualDispatch_RunFrame',
+    'SteamAPI_ManualDispatch_GetNextCallback','SteamAPI_ManualDispatch_FreeLastCallback',
+})
 
 
 class CallbackMessage(C.Structure):
@@ -30,6 +39,7 @@ class SteamBridge:
         self.initialized = False
 
     def bind(self, name, result, arguments):
+        if name not in ALLOWED_EXPORTS: raise AssistantError('Steam 接口超出助手允许的操作范围')
         try:
             function = getattr(self.dll, name)
         except AttributeError as error:

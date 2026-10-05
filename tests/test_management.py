@@ -109,10 +109,72 @@ class ProfileTests(Fixture):
 
 
 class SnapshotTests(Fixture):
+    def test_interrupted_capture_remains_visible_and_not_restorable(self):
+        before=self.config.read_bytes()
+        def fail(source,destination):
+            destination.mkdir(parents=True)
+            (destination/'partial.txt').write_text('partial copy')
+            raise PermissionError('fixture access denied')
+        with patch.object(self.store,'copy_tree',side_effect=fail):
+            with self.assertRaises(PermissionError): self.store.capture(reuse=False)
+        rows=self.store.list(); self.assertEqual(len(rows),1)
+        self.assertEqual(rows[0]['state'],'failed'); self.assertIn('denied',rows[0]['error'])
+        self.assertTrue(list(Path(rows[0]['location']).rglob('partial.txt')))
+        with self.assertRaises(AssistantError): self.store.restore(rows[0]['id'])
+        self.assertEqual(before,self.config.read_bytes())
+
+    def test_legacy_location_remains_readable_and_restorable(self):
+        self.store.root=self.store.legacy_root
+        saved=self.store.capture(); manifest=self.store.root/saved['id']/'snapshot.json'
+        saved['schema']=1; atomic_json(manifest,saved)
+        current=SnapshotStore(self.env,process_guard=self.guard)
+        self.assertEqual(current.list()[0]['location'],str(self.store.root/saved['id']))
+        (self.env.installed/'101/items.xml').write_text('changed')
+        current.restore(saved['id'])
+        self.assertIn('shared',(self.env.installed/'101/items.xml').read_text())
+
+    def test_stage_interruption_leaves_original_and_recoverable_record(self):
+        saved=self.store.capture(); (self.env.installed/'101/items.xml').write_text('live')
+        before=self.config.read_bytes()
+        def crash(phase):
+            if phase=='staged': raise SystemExit('interruption')
+        with self.assertRaises(SystemExit): SnapshotStore(self.env,process_guard=self.guard,fault=crash).restore(saved['id'])
+        self.store.recover()
+        journal=json.loads(next((self.store.root/'transactions').glob('*/transaction.json')).read_text())
+        self.assertEqual(journal['state'],'failed'); self.assertEqual(journal['written'],[])
+        self.assertEqual(before,self.config.read_bytes()); self.assertEqual((self.env.installed/'101/items.xml').read_text(),'live')
+
+    def test_custom_backup_root_swaps_each_directory_on_its_target_volume(self):
+        import os
+        self.env.snapshot_root=self.env.game/'user-selected-backups'
+        store=SnapshotStore(self.env,process_guard=self.guard); saved=store.capture()
+        (self.env.installed/'101/items.xml').write_text('live')
+        original=os.replace; swaps=[]
+        def replace(source,destination):
+            a,b=Path(source),Path(destination)
+            if a.is_dir():
+                # Both directory endpoints must share the installed-mod root.
+                self.assertIn('Installed',a.parts); self.assertIn('Installed',b.parts)
+                swaps.append((a,b))
+            return original(source,destination)
+        with patch('mod_assistant.snapshots.os.replace',side_effect=replace): result=store.restore(saved['id'])
+        self.assertTrue(swaps); self.assertTrue(result['backups'])
+        self.assertIn('shared',(self.env.installed/'101/items.xml').read_text())
+
+    @unittest.skipUnless(__import__('os').name=='nt','Windows long paths')
+    def test_long_paths_copy_verify_and_restore_without_system_setting_changes(self):
+        from mod_assistant.snapshots import native_path
+        path=self.env.installed/'101'/('nested-'+'x'*90)/('file-'+'y'*100+'.txt')
+        native_path(path.parent).mkdir(parents=True)
+        native_path(path).write_text('original deep file')
+        saved=self.store.capture(); native_path(path).write_text('changed')
+        self.store.restore(saved['id'])
+        self.assertEqual(native_path(path).read_text(),'original deep file')
+
     def test_independent_copy_restore_order_and_current_audio(self):
         saved=self.store.capture(); first=self.env.installed/'101/items.xml'
         first.write_text('user-changed'); self.configure(['102'],volume=12)
-        snapshot=self.store.root/saved['id']/'payload/0/items.xml'
+        snapshot=self.store.root/saved['id']/'payload'/saved['records'][0]['payload']/'items.xml'
         self.assertNotEqual(first.read_bytes(),snapshot.read_bytes())
         result=self.store.restore(saved['id'])
         self.assertEqual(read_order(self.env),['101','102']); self.assertIn(b'volume="12"',self.config.read_bytes())
@@ -127,7 +189,7 @@ class SnapshotTests(Fixture):
 
     def test_corrupt_payload_and_game_version_rejected_before_live_mutations(self):
         saved=self.store.capture(); before=self.config.read_bytes()
-        (self.store.root/saved['id']/'payload/0/items.xml').write_text('bad')
+        (self.store.root/saved['id']/'payload'/saved['records'][0]['payload']/'items.xml').write_text('bad')
         with self.assertRaisesRegex(AssistantError,'校验失败'): self.store.restore(saved['id'])
         self.assertEqual(before,self.config.read_bytes()); self.assertIn('shared',(self.env.installed/'101/items.xml').read_text())
         (self.env.game/'Content/ContentPackages/Vanilla.xml').write_text('<contentpackage name="Vanilla" gameversion="changed"/>')
@@ -187,7 +249,7 @@ class CacheAndEvidenceTests(Fixture):
         self.assertEqual(stats['reused'],1); self.assertEqual(first['101'].definitions,second['101'].definitions)
         (mod.source/'a.lua').write_text('Hook.Add("test", "same", function() end)')
         features,stats=inspect_cached(self.env,[mod],metadata); self.assertEqual(stats['scanned'],1)
-        self.assertTrue(features['101'].hook_names)
+        self.assertEqual(features['101'].code_files,1)
         features,stats=inspect_cached(self.env,[mod],{'101':{'children':['102']}})
         self.assertEqual(stats['scanned'],1); self.assertEqual(features['101'].workshop_dependencies,{'102'})
 
@@ -201,7 +263,7 @@ class CacheAndEvidenceTests(Fixture):
 
     def test_corrupt_cache_and_no_prior_cache_light_scan(self):
         mod=self.make('101'); inspect_cached(self.env,[mod])
-        path=next((self.env.work/'analysis/features-v2').glob('*.json')); path.write_text('[]')
+        path=next((self.env.work/'analysis/features-v3').glob('*.json')); path.write_text('[]')
         _,stats=inspect_cached(self.env,[mod]); self.assertEqual(stats['scanned'],1)
         path.write_text('{')
         with patch.object(Path,'rglob',side_effect=AssertionError('no tree walk')):
@@ -224,7 +286,7 @@ class CacheAndEvidenceTests(Fixture):
     def test_csharp_disabled_and_compiled_code_are_not_claimed_compatible(self):
         mod=self.make('101'); (mod.source/'script.cs').write_text('class Example {}')
         feature=inspect(mod); result=evaluate([mod],{'101':feature},True,csharp=False)
-        self.assertEqual(result['101'].compatibility,'低·运行条件')
+        self.assertEqual(result['101'].compatibility,'未知·脚本待核实')
         result=evaluate([mod],{'101':Features('101','A',opaque_code=1)},True)
         self.assertEqual(result['101'].compatibility,'未知·资料不足')
 

@@ -1,6 +1,8 @@
 """Bounded read-only log triage; findings distinguish matches from guesses."""
 from dataclasses import asdict
 from pathlib import Path
+import os
+from datetime import datetime, timezone
 import re
 from .luacs import status
 from .core import AssistantError, reject_link, within
@@ -26,25 +28,36 @@ def recent_logs(env):
     return sorted(approved,key=lambda p:p.stat().st_mtime,reverse=True)[:20]
 
 def redact(text, env=None):
+    text=str(text)
     if env:
-        for path in (env.game,env.player): text=text.replace(str(path),'[本机目录]').replace(path.as_posix(),'[本机目录]')
-    text=re.sub(r'(?i)((?:token|password|authorization|secret|api[_ -]?key)\s*[:=]\s*)\S+',r'\1[隐藏]',text)
+        for path in (env.game,env.player):
+            for value in (str(path).replace('\\','\\\\'),str(path),path.as_posix()): text=re.sub(re.escape(value),'[本机目录]',text,flags=re.I)
+    for value in (str(Path.home()).replace('\\','\\\\'),str(Path.home()),Path.home().as_posix()): text=re.sub(re.escape(value),'[用户目录]',text,flags=re.I)
+    text=re.sub(r'''(?im)((?:token|password|authorization|secret|api[_ -]?key)\s*["']?\s*[:=]\s*)("[^"\r\n]*"|'[^'\r\n]*'|[^\r\n,;]+)''',r'\1[隐藏]',text)
     text=re.sub(r'\b7656119\d{10}\b','[Steam 用户编号]',text)
     return text
 
 def diagnose(path, mods, env=None):
     path=Path(path)
+    reject_link(path)
     with path.open('rb') as stream:
-        length=path.stat().st_size
+        observed=os.fstat(stream.fileno()); length=observed.st_size
         bom=stream.read(2)
         offset=max(0,length-4*1024*1024)
         utf16=bom in (b'\xff\xfe',b'\xfe\xff')
         if utf16 and offset%2: offset+=1
         stream.seek(offset)
-        raw=stream.read()
+        raw=stream.read(4*1024*1024)
+        changed=os.fstat(stream.fileno()).st_mtime_ns!=observed.st_mtime_ns
     if utf16: text=raw.decode('utf-16-le' if bom==b'\xff\xfe' else 'utf-16-be',errors='replace').lstrip('\ufeff')
     else: text=raw.decode('utf-8-sig',errors='replace')
     lines=text.splitlines(); findings=[]
+    if offset and lines: lines=lines[1:]  # A partial first line is not evidence.
+    names=[]
+    for mod in mods:
+        tokens=[mod.name.casefold()] if len(mod.name)>=4 else []
+        if mod.source and len(mod.source.name)>=4: tokens.append(mod.source.name.casefold())
+        names.append((mod.name,list(dict.fromkeys(tokens)),mod.item_id if mod.item_id.isdecimal() else ''))
     patterns=[('重复定义',r'duplicate|already exists|same identifier|重复定义', '核对重叠模组和 Override；普通重复定义通常需要兼容补丁或禁用其中一个。'),
               ('缺失资源/前置',r'missing dependency|dependencies.*missing|could not find|not found|找不到|不存在','检查必需模组是否安装启用、资源路径是否正确；必要时重新校验缓存。'),
               ('版本不匹配',r'incompatible|version mismatch|版本.*不.*匹配','对比游戏、LuaCs 和房主模组版本，避免混用更新前后的组件。'),
@@ -54,18 +67,19 @@ def diagnose(path, mods, env=None):
         for category,pattern,advice in patterns:
             if re.search(pattern,line,re.I):
                 context='\n'.join(lines[max(0,index-1):min(len(lines),index+4)])
-                matches=[]
-                for mod in mods:
-                    tokens=[mod.item_id] if mod.item_id.isdecimal() else []
-                    if len(mod.name)>=4: tokens.append(mod.name)
-                    if mod.source: tokens.append(mod.source.name)
-                    if any(len(token)>=4 and token.casefold() in context.casefold() for token in tokens): matches.append(mod.name)
+                matches=[]; folded=context.casefold()
+                for name,tokens,item in names:
+                    if any(token in folded for token in tokens) or item and re.search(r'(?<!\d)'+re.escape(item)+r'(?!\d)',context): matches.append(name)
                 findings.append({'category':category,'line_in_tail':index+1,'possible_mods':list(dict.fromkeys(matches)),
+                                 'line_in_file':index+1 if offset==0 else None,
                                  'evidence':'日志原文命中；归属仍需核实' if matches else '日志关键词线索，未确定模组归属',
                                  'text':redact(context[:1500],env),'advice':advice})
                 break
-    return {'file':path.name,'tail_only':length>len(raw),'findings':findings[-80:],
-            'note':'只读取最近最多 4 MB；行号相对于读取片段。关键词和路径匹配不等于已确认根因。'}
+    return {'file':path.name,'path':str(path),'tail_only':offset>0,'byte_offset':offset,'changed_during_read':changed,
+            'modified_utc':datetime.fromtimestamp(observed.st_mtime,tz=timezone.utc).isoformat(),
+            'encoding':('UTF-16 LE' if bom==b'\xff\xfe' else 'UTF-16 BE') if utf16 else 'UTF-8',
+            'findings':findings[-80:],
+            'note':'最多读取最近 4 MB；截取日志的行号仅属于读取片段。关键词和路径匹配不等于已确认根因。'}
 
 def lua_verification(env):
     detected=status(env)

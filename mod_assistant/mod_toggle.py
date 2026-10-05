@@ -12,10 +12,11 @@ import uuid
 import xml.etree.ElementTree as ET
 
 from .core import AssistantError, Environment, game_running, load_package, within, scoped_game_guard
+from .game_config import PackageRegion, package_regions
 
 
-BLOCK = re.compile(r"<regularpackages(?:\s[^>]*)?>.*?</regularpackages\s*>", re.I | re.S)
-CORE = re.compile(r"<corepackage(?:\s[^>]*)?\s*/>", re.I | re.S)
+BLOCK = PackageRegion(0)
+CORE = PackageRegion(1)
 WORKSHOP_PATH = re.compile(r"(?:^|/)workshopmods/installed/(\d+)/filelist\.xml$", re.I)
 
 
@@ -47,11 +48,14 @@ def configured_key(value: str, env: Environment) -> str | None:
 def enabled_ids(env: Environment) -> set[str]:
     path = env.game / "config_player.xml"
     try:
-        root = ET.fromstring(path.read_bytes())
-    except (OSError, ET.ParseError) as error:
+        text=path.read_bytes().decode('utf-8-sig')
+        regular,core=package_regions(text)
+        if regular is None or core is None: raise AssistantError('游戏内容包配置格式不受支持')
+        roots=[ET.fromstring(region.group()) for region in (regular,core)]
+    except (OSError, UnicodeError, ET.ParseError) as error:
         raise AssistantError(f"无法读取游戏模组配置：{error}") from error
     ids = set()
-    for element in root.iter():
+    for element in (element for root in roots for element in root.iter()):
         if element.tag.lower() in ("package", "corepackage"):
             item = configured_key(element.get("path", ""), env)
             if item:
@@ -98,8 +102,7 @@ def set_enabled(env: Environment, item_id: str, enabled: bool,
     core = next((x for x in section if x.tag.lower() == "corepackage"), None)
     if regular is None or core is None:
         raise AssistantError("游戏配置缺少核心或普通模组列表")
-    block = BLOCK.search(source)
-    core_block = CORE.search(source)
+    block, core_block = package_regions(source)
     if block is None or core_block is None:
         raise AssistantError("游戏配置的模组区域格式不受支持，请在游戏内调整")
     current_regular = [x for x in regular if x.tag.lower() == "package"]
@@ -112,7 +115,7 @@ def set_enabled(env: Environment, item_id: str, enabled: bool,
     parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
     edit_regular = ET.fromstring(block.group(), parser=parser)
     for child in list(edit_regular):
-        if child.tag == "package" and configured_key(child.get("path", ""), env) == item_id:
+        if isinstance(child.tag, str) and child.tag.casefold() == "package" and configured_key(child.get("path", ""), env) == item_id:
             edit_regular.remove(child)
     path_value = (target.relative_to(env.game).as_posix() if within(target, env.game)
                   else target.as_posix())

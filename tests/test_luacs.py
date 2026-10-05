@@ -40,7 +40,7 @@ class LuaCsTests(unittest.TestCase):
                                        opener=lambda *args, **kwargs: io.BytesIO(self.archive))
 
     def test_install_enable_cs_and_restore_original_files(self):
-        result = self.installer.install()
+        result = self.installer.install(enable_csharp=True)
         self.assertTrue(result["changed"])
         self.assertTrue(status(self.env).runtime)
         self.assertTrue(status(self.env).csharp)
@@ -71,6 +71,21 @@ class LuaCsTests(unittest.TestCase):
             self.installer.install()
         self.assertEqual((self.env.game / "Barotrauma.dll").read_bytes(), b"vanilla")
 
+    def test_archive_cannot_add_unreviewed_files_elsewhere_in_game_folder(self):
+        self.make_patch(extra={'UnrelatedTool.exe':b'not part of the approved patch'})
+        with self.assertRaisesRegex(AssistantError,'尚未审核'): self.installer.install()
+        self.assertEqual((self.env.game/'Barotrauma.dll').read_bytes(),b'vanilla')
+        self.assertFalse((self.env.game/'UnrelatedTool.exe').exists())
+
+    def test_post_write_changes_are_reported_without_overwriting_unknown_bytes(self):
+        def modify(phase):
+            if phase=='replaced': (self.env.game/'Barotrauma.dll').write_bytes(b'changed by another writer')
+        self.installer.fault=modify
+        with self.assertRaises(AssistantError): self.installer.install()
+        self.assertEqual((self.env.game/'Barotrauma.dll').read_bytes(),b'changed by another writer')
+        self.assertFalse((self.env.work/'luacs/last-install.json').exists())
+        self.assertTrue(list((self.env.work/'luacs/backups').glob('*/Barotrauma.dll')))
+
     def test_interrupted_install_recovers_next_time(self):
         self.installer.fault = lambda phase: (_ for _ in ()).throw(SystemExit("crash"))
         with self.assertRaises(SystemExit):
@@ -85,7 +100,7 @@ class LuaCsTests(unittest.TestCase):
         (self.env.game / "LuaCsSetupConfig.xml").write_text(
             '<LuaCsSetupConfig EnableCsScripting="false" HideUserNames="false" />')
         self.installer.release_loader = lambda: self.fail("should not download")
-        self.installer.install()
+        self.installer.set_csharp(True)
         self.assertTrue(status(self.env).csharp)
         self.assertIn(b'HideUserNames="false"', (self.env.game / "LuaCsSetupConfig.xml").read_bytes())
 
@@ -105,9 +120,57 @@ class LuaCsTests(unittest.TestCase):
         path.write_text('<Configuration><LuaCsForBarotrauma><CsRunPolicy Value="Prompt"/>'
                         '<UseCaching Value="false"/></LuaCsForBarotrauma></Configuration>')
         self.assertFalse(status(self.env).csharp)
-        self.installer.install()
+        self.installer.set_csharp(True)
         self.assertTrue(status(self.env).csharp)
         self.assertIn(b'UseCaching Value="false"', path.read_bytes())
+
+    def test_runtime_install_does_not_enable_or_replace_existing_csharp_policy(self):
+        self.make_patch(extra={'LuaCsSetupConfig.xml':b'<LuaCsSetupConfig EnableCsScripting="true"/>'})
+        settings=self.env.game/'LuaCsSetupConfig.xml'
+        original=b'<LuaCsSetupConfig EnableCsScripting="false" HideUserNames="false"/>'
+        settings.write_bytes(original)
+        self.installer.install()
+        self.assertTrue(status(self.env).runtime); self.assertFalse(status(self.env).csharp)
+        self.assertEqual(settings.read_bytes(),original)
+        self.assertFalse((self.env.game/MODERN_SETTINGS).exists())
+
+    def test_separate_csharp_switch_never_downloads_and_retains_runtime_backup(self):
+        import json
+        result=self.installer.install(); original_receipt=(self.env.work/'luacs/last-install.json').read_bytes()
+        self.installer.release_loader=lambda:self.fail('C# settings must not download')
+        self.installer.set_csharp(True); self.assertTrue(status(self.env).csharp)
+        self.assertEqual(original_receipt,(self.env.work/'luacs/last-install.json').read_bytes())
+        receipt=json.loads((self.env.work/'luacs/last-csharp.json').read_text())
+        self.assertEqual({entry['name'] for entry in receipt['records']},{'LuaCsSetupConfig.xml',MODERN_SETTINGS})
+        self.installer.set_csharp(False); self.assertFalse(status(self.env).csharp)
+        self.installer.restore(); self.assertEqual((self.env.game/'Barotrauma.dll').read_bytes(),b'vanilla')
+
+    def test_legacy_runtime_upgrade_preserves_effective_csharp_choice_and_restores(self):
+        for enabled in (True,False):
+            with self.subTest(enabled=enabled):
+                (self.env.game/'Barotrauma.dll').write_bytes(b'LuaCs legacy client')
+                for name in ('BarotraumaCore.dll','MoonSharp.Interpreter.dll'):
+                    (self.env.game/name).write_bytes(b'legacy dependency')
+                legacy=self.env.game/'LuaCsSetupConfig.xml'
+                original=('<LuaCsSetupConfig EnableCsScripting="'+str(enabled).lower()+'" HideUserNames="false"/>').encode()
+                legacy.write_bytes(original)
+                modern=self.env.game/MODERN_SETTINGS
+                self.assertFalse(modern.exists())
+                self.make_patch(extra={'Barotrauma.dll':b'LuaCs CsRunPolicy modern client'})
+                self.installer.install(refresh=True)
+                self.assertEqual(status(self.env).csharp,enabled)
+                self.assertEqual(legacy.read_bytes(),original)
+                self.assertIn(b'Enabled' if enabled else b'Disabled',modern.read_bytes())
+                self.installer.restore('runtime')
+                self.assertEqual((self.env.game/'Barotrauma.dll').read_bytes(),b'LuaCs legacy client')
+                self.assertFalse(modern.exists())
+
+    def test_csharp_switch_requires_installed_runtime_and_rolls_back_failure(self):
+        with self.assertRaisesRegex(AssistantError,'先安装'): self.installer.set_csharp(True)
+        self.installer.install(); assembly=(self.env.game/'Barotrauma.dll').read_bytes()
+        self.installer.fault=lambda phase:(_ for _ in ()).throw(OSError('settings write failure'))
+        with self.assertRaises(OSError): self.installer.set_csharp(True)
+        self.assertFalse(status(self.env).csharp); self.assertEqual(assembly,(self.env.game/'Barotrauma.dll').read_bytes())
 
     def test_existing_ready_runtime_has_no_invented_original_backup(self):
         (self.env.game/'Barotrauma.dll').write_bytes(b'LuaCs already installed')
@@ -128,9 +191,10 @@ class LuaCsTests(unittest.TestCase):
         self.assertIn('已经恢复',restore_info(self.env).text)
         for name,data in [('Barotrauma.dll',b'LuaCs previously installed'),('BarotraumaCore.dll',b'core'),('MoonSharp.Interpreter.dll',b'lua')]:
             (self.env.game/name).write_bytes(data)
-        self.installer.install()
-        self.assertIn('设置备份',restore_info(self.env).text)
-        self.installer.restore()
+        self.installer.set_csharp(True)
+        self.assertIn('设置备份',restore_info(self.env,'csharp').text)
+        self.assertFalse(restore_info(self.env).available)
+        self.installer.restore('csharp')
         self.assertTrue(status(self.env).runtime)
         self.assertEqual((self.env.game/'Barotrauma.dll').read_bytes(),b'LuaCs previously installed')
 

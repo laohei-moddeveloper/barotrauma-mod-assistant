@@ -23,6 +23,8 @@ class UiTests(Fixture):
         self.app.assessments=self.app.evaluate_current(); self.app.render()
 
     def tearDown(self):
+        if self.app.worker and self.app.worker.is_alive():
+            self.app.cancel.set(); self.app.worker.join(3)
         for callback in self.root.tk.call('after','info'):
             self.root.after_cancel(callback)
         self.root.update_idletasks()

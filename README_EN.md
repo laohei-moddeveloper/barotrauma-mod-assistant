@@ -1,6 +1,6 @@
 # BaroDock | Barotrauma Mod Manager
 
-Version **0.8.1** is a standalone mod manager for the Steam version of Barotrauma on **64-bit Windows**, with **English and Simplified Chinese** interfaces.
+Version **0.9.0** is a standalone mod manager for the Steam version of Barotrauma on **64-bit Windows**, with **English and Simplified Chinese** interfaces.
 
 [Download](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/latest) · [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3812360206&l=english) · [中文说明](使用说明.md)
 
@@ -25,22 +25,22 @@ Use the **中文 / English** selector at the top of the window. Language changes
 1. Keep Steam signed in. Close the game and dedicated server before changing files, enabled mods, profiles, order, or LuaCs.
 2. Wait for scanning. **Update** selects a mod for the task; **Enabled** controls whether the game loads it next time. These are separate choices.
 3. Click **Update mods**. Defaults: 4 concurrent Workshop requests and 3 installations. Adjust these in **Settings & appearance**.
-4. Open **Load order** for drag-and-drop, **Auto-sort**, before/after rules, and locked positions. Click **Apply draft** to apply it on the next game launch.
+4. Open **Load order** for drag-and-drop, **Auto-sort preview**, before/after rules, and locked positions. Click **Apply draft** to apply it on the next game launch.
 5. Click **Launch game** when finished.
 
 Use **Mods** for filtering, search, enabled state, order, and profiles. Use **Tools & scripts** for LuaCs, logs, cache installation, and exports. **Settings & appearance** has themes, colors, font size, list spacing, and update settings.
 
 ## Profiles, snapshots, and scripts
 
-Profiles save the core package, enabled regular mods, order, installed versions, and available verified fingerprints. Review differences before applying. Subscribe to missing items manually in Steam first; **Download & apply** downloads only already subscribed items. Install local mods separately. Steam provides current versions, not historical versions from a shared list. Differences block switching by default unless you explicitly allow current local versions/files.
+New presets use the game's ModLists XML and save the core package, enabled regular mods and order. They do not store versions or hashes. Existing JSON profiles and the JSON friend-list export retain their recorded version/hash information. Review differences before applying. Subscribe to missing items manually in Steam first; **Download & apply** downloads only already subscribed items. Install local mods separately. Steam provides current versions, not historical versions from a shared list. Differences block switching by default unless you explicitly allow current local versions/files.
 
 Snapshots keep independent copies of saved mod files and enabled configuration, using disk space. They restore only previously saved files and do not restore Steam subscriptions, original Steam cache, or the LuaCs client patch. LuaCs has its own pre-installation backup and restore action.
 
-**Install LuaCs + enable C#** obtains a matching official Windows client patch, verifies it, backs up replaced files, and enables persistent C# scripting. This changes only your local client; other computers and dedicated servers need separate setup. Use trusted script mods and follow the post-install checklist. File checks do not confirm scripts work in game.
+**Install / update LuaCs** obtains a matching official Windows client patch, verifies it, backs up replaced files and preserves your C# setting. **Enable C# separately**, **Disable C#** and **Restore C# settings** manage settings independently. C# mods are not sandboxed. This changes only your local client; other computers and dedicated servers need separate setup. Use trusted script mods and follow the post-install checklist. File checks do not confirm scripts work in game.
 
 ## Understand the results
 
-Compatibility ratings and auto-sort are static analysis suggestions. They compare resource IDs, XML Overrides, readable Lua hooks, and C# method patches, but cannot fully predict compiled code, dynamic scripts, or runtime interactions. Follow mod authors' instructions and test in game. **Impact** means the scope of changes, not mod quality. The assistant does not repair mod code conflicts.
+Compatibility ratings and auto-sort are static analysis suggestions. They compare XML resource definitions, Overrides and explicit dependencies. Lua/C# files are counted, not analyzed for execution or conflicts. Script compatibility is marked unverified; compiled code and runtime interactions cannot be predicted. Follow mod authors' instructions and test in game. **Impact** means the scope of changes, not mod quality. The assistant does not repair mod code conflicts.
 
 Steam controls actual downloads. Parallel requests, installations, and cache reuse cannot bypass Steam's queue, server limits, or your bandwidth. Accepted downloads may continue after stopping the assistant. Steam may show Barotrauma as running while the assistant uses its Workshop interface, without opening a game window.
 
@@ -80,4 +80,12 @@ In **Load order → Edit draft**, add installed regular mods, disable selected e
 
 Search accepts separate words: `Demo Pack` matches `Demo Equipment Expansion Pack`; every word must match the name, ID or type. Ctrl+C in the mod list or the context menu copies selected names/IDs without reading the clipboard. **No direct conflict found · Needs testing** means no static overlap was found, not proven compatibility. Affliction Overrides do not receive a predicted winner based only on list position.
 
-See [Community feedback and design decisions](docs/community-feedback.md) for sources and remaining work. Runtime dependencies remain the Python standard library; the released EXE includes its runtime.
+See [Community feedback and design decisions](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/docs/community-feedback.md) for sources and remaining work. Runtime dependencies remain the Python standard library; the released EXE includes its runtime.
+
+## 0.9.0: reliability and useful evidence
+
+The prominent **Auto-sort preview** action computes in the background, supports cancellation, shows position changes and their reasons, and reports the actual dependency cycle. Applying remains a separate confirmation. A small, read-only subset of local BMT metadata.xml supplies author declarations; missing dependencies are never enabled or subscribed automatically. **Compare XML overrides** shows the definitions and a text diff to help investigate collisions or build companion patches; it cannot determine every game loader result.
+
+Backups default to BaroDockBackups in your user game folder. Choose another location, open a backup in Explorer or copy its path. Failed/incomplete copies remain visible but cannot be restored. Restore staging and pre-restore files stay on each target drive, including when the backup is elsewhere. Legacy snapshots remain supported. **Tools → Recent error details** shows the operation, version, error ID, cause and a redacted local traceback. Review all content before manually sharing; no upload occurs.
+
+See [Design, source references and updater decision](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/docs/reliability-design.md). Game preset XML was checked against the official reader fields; actual in-game preset loading and gameplay compatibility were not tested for this release.

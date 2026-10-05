@@ -26,17 +26,16 @@ class AnalysisTests(unittest.TestCase):
             (folder / "logic.lua").write_text(code, encoding="utf-8")
         return Mod(item, name, folder, enabled=enabled)
 
-    def test_code_hook_collision_is_visible_before_enabling(self):
+    def test_matching_script_strings_do_not_claim_execution_or_conflicts(self):
         a = self.make_mod("101", "A", code='Hook.Add("roundStart", "same", function() end)')
         b = self.make_mod("102", "B", code='Hook.Add("roundStart", "same", function() end)')
         features = {m.item_id: inspect(m) for m in (a, b)}
-        self.assertEqual(pair_evidence(features["101"], features["102"])[0], 3)
+        self.assertEqual(pair_evidence(features["101"], features["102"])[0], 0)
         result = evaluate([a, b], features, runtime_luacs=True)
-        self.assertEqual(result["101"].compatibility, "低·潜在冲突风险")
-        self.assertIn("Hook.Add", " ".join(result["101"].reasons))
+        self.assertEqual(result["101"].compatibility, "未知·脚本待核实")
         a.enabled = b.enabled = True
         result = evaluate([a, b], features, runtime_luacs=True)
-        self.assertEqual(result["101"].compatibility, "低·当前冲突风险")
+        self.assertEqual(result["101"].compatibility, "未知·脚本待核实")
 
     def test_distinct_hook_names_on_same_event_are_not_marked_conflicting(self):
         a = self.make_mod("101", "A", code='Hook.Add("roundStart", "first", function() end)')
@@ -52,13 +51,19 @@ class AnalysisTests(unittest.TestCase):
         features = {m.item_id: inspect(m) for m in (a, b)}
         score, reason = pair_evidence(features["101"], features["102"])
         self.assertEqual(score, 3)
-        self.assertIn("applydamage", reason)
+        self.assertNotIn("applydamage", reason)
+        self.assertIn("duplicate", reason)
         self.assertEqual(len(features["101"].definitions & features["102"].definitions), 2)
 
-    def test_named_lua_patch_resolves_method_not_registration_id(self):
+    def test_script_source_is_not_read_or_scored_as_behavior(self):
+        from unittest.mock import patch
         mod = self.make_mod("101", "A", code=(
             'Hook.Patch("unique_patch_id", "Barotrauma.Character", "ApplyDamage", function() end)'))
-        self.assertIn(("barotrauma.character", "applydamage"), inspect(mod).patches)
+        original=Path.read_text
+        def read(path,*args,**kwargs):
+            if path.suffix=='.lua': raise AssertionError('script source must not be read')
+            return original(path,*args,**kwargs)
+        with patch.object(Path,'read_text',read): self.assertEqual(inspect(mod).code_files,1)
 
     def test_item_component_identifiers_do_not_create_false_prefab_collision(self):
         a = self.make_mod("101", "A", ["distinct_a"])
@@ -74,10 +79,20 @@ class AnalysisTests(unittest.TestCase):
         a = self.make_mod("101", "A", code='-- Hook.Add("think", "ignored", noop)\nHook.Add("think", "real", noop)')
         b = self.make_mod("102", "B")
         features = {m.item_id: inspect(m) for m in (a, b)}
-        self.assertEqual(features["101"].hook_names, {("think", "real")})
+        self.assertEqual(features["101"].code_files,1)
         features["101"].workshop_dependencies.add("102")
         self.assertEqual(evaluate([a, b], features, runtime_luacs=True)["101"].compatibility, "低·缺前置")
-        self.assertEqual(evaluate([a, b], features, runtime_luacs=False)["101"].compatibility, "低·运行条件")
+        self.assertEqual(evaluate([a, b], features, runtime_luacs=False)["101"].compatibility, "低·缺前置")
+        features['101'].workshop_dependencies.clear()
+        self.assertEqual(evaluate([a,b],features,runtime_luacs=False)['101'].compatibility,'未知·脚本待核实')
+
+    def test_commented_harmony_example_never_creates_method_conflict(self):
+        mods=[self.make_mod(item,item) for item in ('101','102')]
+        for mod in mods:
+            (mod.source/'example.cs').write_text('/* [HarmonyPatch(typeof(ExampleOwner), "ExampleMethod")] */')
+        features={mod.item_id:inspect(mod) for mod in mods}
+        self.assertEqual(pair_evidence(features['101'],features['102'])[0],0)
+        self.assertTrue(all(result.compatibility=='未知·脚本待核实' for result in evaluate(mods,features,True,csharp=True).values()))
 
 
 if __name__ == "__main__": unittest.main()

@@ -1,4 +1,4 @@
-"""Install the official Windows client patch and enable its C# configuration."""
+"""Journalled official-patch installation and separate C# configuration."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,6 +20,18 @@ from .core import AssistantError, Cancelled, Environment, atomic_json, game_runn
 RELEASE_API = "https://api.github.com/repos/evilfactory/LuaCsForBarotrauma/releases/tags/latest"
 ASSET_NAME = "luacsforbarotrauma_patch_windows_client.zip"
 MODERN_SETTINGS = "Data/Mods/LuaCsForBarotrauma/SettingsData.xml"
+# Audited against the official Windows client archive. New payload locations
+# require review rather than silently expanding the installer's write scope.
+PATCH_ROOT_FILES=set(('BarotraumaCore.dll BarotraumaCore.pdb Barotrauma.dll Barotrauma.pdb DedicatedServer.dll DedicatedServer.pdb '
+    'Barotrauma.deps.json DedicatedServer.deps.json 0Harmony.dll Sigil.dll MoonSharp.Interpreter.dll MoonSharp.VsCodeDebugger.dll '
+    'MonoMod.Backports.dll MonoMod.Core.dll MonoMod.RuntimeDetour.dll MonoMod.ILHelpers.dll MonoMod.Utils.dll MonoMod.Iced.dll '
+    'Mono.Cecil.dll Mono.Cecil.Mdb.dll Mono.Cecil.Pdb.dll Mono.Cecil.Rocks.dll LightInject.dll OneOf.dll FluentResults.dll '
+    'Basic.Reference.Assemblies.Net80.dll Microsoft.Extensions.Logging.Abstractions.dll Microsoft.Toolkit.Diagnostics.dll '
+    'Microsoft.CodeAnalysis.CSharp.dll Microsoft.CodeAnalysis.dll System.Collections.Immutable.dll System.Reflection.Metadata.dll '
+    'System.Runtime.CompilerServices.Unsafe.dll mscordaccore_amd64_amd64_8.0.23.53103.dll LuaCsSetupConfig.xml').split())
+
+def approved_patch_path(name):
+    return name in PATCH_ROOT_FILES or name in {'Publicized/'+value for value in ('Barotrauma.dll','BarotraumaCore.dll','DedicatedServer.dll')} or name.startswith('LocalMods/LuaCsForBarotrauma/')
 
 RESTORE_GUIDE = "\n".join(('这个按钮只恢复最近一次由助手保存的原文件，不是通用卸载按钮。', '如果安装前已经有 LuaCs，助手可能只备份 C# 设置；恢复设置不会卸载已有 LuaCs。', '没有备份时，继续使用正常的 LuaCs 不需要处理，也不需要反复点击安装。', '若要移除客户端补丁：先关闭游戏和助手，再在 Steam 中打开游戏属性 → 已安装文件 → 验证游戏文件完整性。', '如果 Steam 启动选项含 LuaCs/Luatrauma 自动安装命令，先移除该命令；否则启动游戏时可能再次安装。', '依赖 LuaCs/C# 的模组需要脚本支持；卸载前先在游戏里停用这些模组。', '验证完整性还原游戏原版文件，与恢复助手安装前的状态不同。'))
 
@@ -31,10 +43,12 @@ class RestoreInfo:
     journal: dict | None = None
 
 
-def restore_info(env: Environment) -> RestoreInfo:
-    path = env.work / 'luacs/last-install.json'
+def restore_info(env: Environment, operation='runtime') -> RestoreInfo:
+    if operation not in ('runtime','csharp'): raise AssistantError('LuaCs 操作类型无效')
+    path = env.work / ('luacs/last-install.json' if operation=='runtime' else 'luacs/last-csharp.json')
     try:
         if not path.exists():
+            if operation=='csharp': return RestoreInfo(False,'没有助手 C# 设置备份；当前开关不受影响。')
             return RestoreInfo(False, '没有助手安装备份；恢复操作不可用。当前 LuaCs 不受影响。')
         if path.stat().st_size > 1_000_000:
             raise ValueError('Oversized journal')
@@ -118,7 +132,7 @@ def release_info() -> dict:
             "size": int(asset.get("size", 0)), "release": release.get("published_at", "")}
 
 
-def cs_config(env: Environment) -> bytes:
+def cs_config(env: Environment, enabled=True) -> bytes:
     path = env.game / "LuaCsSetupConfig.xml"
     if path.exists():
         data = path.read_bytes()
@@ -128,15 +142,15 @@ def cs_config(env: Environment) -> bytes:
             raise AssistantError("LuaCs 设置文件损坏，保留原文件，未开启 C#") from error
         if root.tag != "LuaCsSetupConfig":
             raise AssistantError("LuaCs 设置格式不受支持")
-        if root.get("EnableCsScripting", "false").casefold() == "true":
+        if root.get("EnableCsScripting", "false").casefold() == str(enabled).lower():
             return data
-        root.set("EnableCsScripting", "true")
+        root.set("EnableCsScripting", str(enabled).lower())
     else:
-        root = ET.Element("LuaCsSetupConfig", {"EnableCsScripting": "true"})
+        root = ET.Element("LuaCsSetupConfig", {"EnableCsScripting": str(enabled).lower()})
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
-def modern_cs_config(env: Environment) -> bytes:
+def modern_cs_config(env: Environment, enabled=True) -> bytes:
     path = env.game / MODERN_SETTINGS
     if path.exists():
         original = path.read_bytes()
@@ -155,9 +169,10 @@ def modern_cs_config(env: Environment) -> bytes:
     policy = package.find("CsRunPolicy")
     if policy is None:
         policy = ET.SubElement(package, "CsRunPolicy")
-    if policy.get("Value", "").casefold() == "enabled" and original:
+    desired='Enabled' if enabled else 'Disabled'
+    if policy.get("Value", "").casefold() == desired.casefold() and original:
         return original
-    policy.set("Value", "Enabled")
+    policy.set("Value", desired)
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
@@ -223,6 +238,7 @@ class LuaCsInstaller:
                     raise AssistantError("补丁包含不安全的文件路径")
                 if entry.is_dir():
                     continue
+                if not approved_patch_path(name): raise AssistantError('官方补丁包含尚未审核的文件位置，未安装：'+name)
                 if name.casefold() in folded:
                     raise AssistantError("补丁包含重复文件路径")
                 folded.add(name.casefold())
@@ -240,25 +256,47 @@ class LuaCsInstaller:
                 raise AssistantError("LuaCs 官方补丁与本机游戏版本不一致，未修改游戏文件")
             return files
 
-    def install(self) -> dict:
+    def install(self, enable_csharp=False, refresh=False) -> dict:
         self.check()
         self.recover()
         detected = status(self.env)
-        if detected.runtime and detected.csharp:
-            return {"changed": False, "message": "LuaCs 和 C# 已就绪，无需重复安装", "backup": ""}
-        files = {}
-        if not detected.runtime:
+        if detected.runtime and not refresh and (not enable_csharp or detected.csharp):
+            return {"changed": False, "message": "LuaCs 已检出，无需重复安装；C# 设置保持原选择", "backup": ""}
+        files = {}; info=None
+        if not detected.runtime or refresh:
             self.emit("正在读取 LuaCs 官方发布信息…")
             info = self.release_loader()
             archive = self.download(info)
             self.emit("正在核对补丁与游戏版本…")
             files = self.payload(archive)
-        files["LuaCsSetupConfig.xml"] = cs_config(self.env)
-        files[MODERN_SETTINGS] = modern_cs_config(self.env)
+        # Patch defaults must never overwrite an existing scripting policy.
+        files.pop('LuaCsSetupConfig.xml',None); files.pop(MODERN_SETTINGS,None)
+        # New LuaCs versions use CsRunPolicy rather than the legacy setting.
+        # Migrate an existing runtime's explicit choice without granting C# to
+        # a fresh installation or treating a stale vanilla setting as consent.
+        legacy=self.env.game/'LuaCsSetupConfig.xml'
+        if (not enable_csharp and detected.runtime and legacy.is_file()
+                and not (self.env.game/MODERN_SETTINGS).exists()
+                and b'CsRunPolicy' in files.get('Barotrauma.dll',b'')):
+            cs_config(self.env,detected.csharp)  # Validate before any writes.
+            files[MODERN_SETTINGS]=modern_cs_config(self.env,detected.csharp)
+        if enable_csharp:
+            files['LuaCsSetupConfig.xml']=cs_config(self.env)
+            files[MODERN_SETTINGS]=modern_cs_config(self.env)
+        return self._commit(files,'runtime', 'LuaCs 官方客户端补丁已安装；C# 设置保持原选择' if not enable_csharp else 'LuaCs 和 C# 设置已应用',info)
+
+    def set_csharp(self, enabled):
+        self.check(); self.recover()
+        if type(enabled) is not bool: raise AssistantError('C# 开关选项无效')
+        if not status(self.env).runtime: raise AssistantError('请先安装 LuaCs，再单独设置 C#')
+        return self._commit({'LuaCsSetupConfig.xml':cs_config(self.env,enabled),MODERN_SETTINGS:modern_cs_config(self.env,enabled)},
+                            'csharp','C# 已开启；请只使用可信脚本模组' if enabled else 'C# 已关闭；依赖 C# 的模组可能无法工作')
+
+    def _commit(self,files,operation,message,source=None):
         files = {name: data for name, data in files.items()
                  if not (self.env.game / name).is_file() or (self.env.game / name).read_bytes() != data}
         if not files:
-            return {"changed": False, "message": "LuaCs 和 C# 已就绪", "backup": ""}
+            return {"changed": False, "message": "所选文件和设置没有变化", "backup": ""}
         self.check()
         root = self.env.work / "luacs"
         backup = root / "backups" / (time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8])
@@ -279,7 +317,7 @@ class LuaCsInstaller:
                     raise AssistantError("游戏文件备份时发生变化，安装已停止")
             records.append({"name": name, "existed": existed, "old_hash": old_hash,
                             "new_hash": hashlib.sha256(data).hexdigest()})
-        journal = {"backup": str(backup), "records": records, "written": [], "state": "pending"}
+        journal = {"backup": str(backup), "records": records, "written": [], "state": "pending",'operation':operation,'source':source}
         atomic_json(root / "transaction.json", journal)
         try:
             for record in records:
@@ -299,18 +337,21 @@ class LuaCsInstaller:
                 finally:
                     if temporary.exists():
                         temporary.unlink()
-                self.emit("安装 LuaCs：" + name)
+                self.emit("写入所选 LuaCs 文件或设置：" + name)
                 self.fault("replaced")
             self.check()
+            for record in records:
+                if _hash(self.env.game / record['name']) != record['new_hash']:
+                    raise AssistantError('LuaCs 文件在写入后发生变化，未确认安装成功；请保留备份并查看错误详情')
             journal["state"] = "complete"
             atomic_json(root / "transaction.json", journal)
-            atomic_json(root / "last-install.json", journal)
+            atomic_json(root / ('last-install.json' if operation=='runtime' else 'last-csharp.json'), journal)
         except Exception:
             self._restore(journal, partial=True)
             journal["state"] = "rolled_back"
             atomic_json(root / "transaction.json", journal)
             raise
-        return {"changed": True, "message": "LuaCs 客户端和 C# 已就绪；下次启动游戏生效", "backup": str(backup)}
+        return {"changed": True, "message":message+'；下次启动游戏生效', "backup": str(backup)}
 
     def _restore(self, journal: dict, partial=False):
         backup = Path(journal["backup"])
@@ -357,11 +398,12 @@ class LuaCsInstaller:
                 atomic_json(path, journal)
                 self.emit("已恢复上次未完成的 LuaCs 安装")
 
-    def restore(self):
+    def restore(self, operation='runtime'):
         self.check()
         self.recover()
-        path = self.env.work / "luacs" / "last-install.json"
-        info = restore_info(self.env)
+        if operation not in ('runtime','csharp'): raise AssistantError('LuaCs 操作类型无效')
+        path=self.env.work/'luacs'/('last-install.json' if operation=='runtime' else 'last-csharp.json')
+        info = restore_info(self.env,operation)
         if not info.available:
             raise AssistantError(info.text)
         journal = info.journal

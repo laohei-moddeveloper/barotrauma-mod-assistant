@@ -8,9 +8,10 @@ import re
 import time
 import uuid
 import xml.etree.ElementTree as ET
-from .core import APP_ID, AssistantError, atomic_json, files_snapshot, game_running, inventory, load_package, reject_link, within, scoped_game_guard
+from .core import APP_ID, AssistantError, atomic_json, files_snapshot, game_running, inventory, load_package, package_names, reject_link, within, scoped_game_guard
 from .mod_toggle import BLOCK, CORE, configured_key, local_id
 from .mod_order import read_order
+from .game_config import package_regions
 
 SCHEMA = 'barotrauma-mod-profile-v2'
 
@@ -31,7 +32,7 @@ def reference(env, mod):
             if receipt.get('installed_snapshot') == {name:list(value) for name,value in files_snapshot(path).items()}:
                 fingerprint = receipt.get('fingerprint','')
         except (OSError,ValueError): pass
-    return {'id': mod.item_id, 'name': package.get('name',mod.name) if package is not None else mod.name, 'mod_version': package.get('modversion', '') if package is not None else '',
+    return {'id': mod.item_id, 'name': package_names(package,mod.name)[0] if package is not None else mod.name, 'mod_version': package.get('modversion', '') if package is not None else '',
             'assistant_fingerprint':fingerprint,
             'core': package.get('corepackage', 'false').casefold() == 'true' if package is not None else False}
 
@@ -39,8 +40,8 @@ def capture_profile(env, name='当前配置', mods=None):
     mods = mods if mods is not None else inventory(env)
     known = {mod.item_id: mod for mod in mods}
     original=(env.game/'config_player.xml').read_bytes()
-    document = ET.fromstring(original)
-    core = next((node for node in document.iter() if node.tag.casefold() == 'corepackage'), None)
+    _,core_region=package_regions(original.decode('utf-8-sig'))
+    core=ET.fromstring(core_region.group()) if core_region else None
     key = configured_key(core.get('path', ''), env) if core is not None else None
     core_path=Path(core.get('path','').replace('\\','/')) if core is not None else None
     if core_path is not None and not core_path.is_absolute(): core_path=env.game/core_path
@@ -70,6 +71,11 @@ def normalize_profile(data):
     result = dict(data)
     seen = set()
     values = list(data['order']) + ([data['core']] if data.get('core') is not None else [])
+    native=data.get('native_entries')
+    if native is not None:
+        if not isinstance(native,list) or len(native)>1000: raise AssistantError('配置格式或模组数量不受支持')
+        # Validate the native source independently; it includes the current core.
+        normalize_profile({key:value for key,value in {**data,'order':native,'core':None}.items() if key!='native_entries'})
     for entry in values:
         if not isinstance(entry, dict): raise AssistantError('配置中的模组项目无效')
         item = entry.get('id', '')
@@ -90,13 +96,15 @@ def normalize_profile(data):
 def resolve_profile(env, data, mods=None):
     data = normalize_profile(data)
     mods = mods if mods is not None else inventory(env)
+    from .native_profiles import materialize_native
+    data=materialize_native(env,data,mods)
     known = {mod.item_id: mod for mod in mods}
     resolved, missing, differences = {}, [], []
     refs = list(data['order']) + ([data['core']] if data.get('core') else [])
     for entry in refs:
         item = entry['id']; mod = known.get(item)
         if item.startswith('local:') and mod is None:
-            matches = [m for m in mods if m.item_id.startswith('local:') and m.name == entry.get('name')]
+            matches = [m for m in mods if m.item_id.startswith('local:') and entry.get('name','').casefold() in {value.casefold() for value in (m.name,*m.aliases)}]
             if len(matches) == 1: mod = matches[0]
         path = installed_path(env, mod) if mod else None
         if mod is None or path is None or not (path / 'filelist.xml').is_file():
@@ -115,11 +123,12 @@ def resolve_profile(env, data, mods=None):
 
 def config_bytes(env, data, mods=None, original=None):
     data = normalize_profile(data)
+    from .native_profiles import materialize_native
+    data=materialize_native(env,data,mods)
     resolved, missing, _ = resolve_profile(env, data, mods)
     if missing: raise AssistantError('缺少已安装模组：' + '、'.join(x.get('name', x['id']) for x in missing[:8]))
     original = (env.game / 'config_player.xml').read_bytes() if original is None else original
-    ET.fromstring(original)
-    source = original.decode('utf-8-sig'); block, core_block = BLOCK.search(source), CORE.search(source)
+    source = original.decode('utf-8-sig'); block, core_block = package_regions(source)
     if block is None or core_block is None: raise AssistantError('游戏内容包配置格式不受支持')
     regular = ET.fromstring(block.group(), parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)))
     existing = {}; pending = []

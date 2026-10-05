@@ -5,8 +5,10 @@ NETWORK_NOTICE = ('联网操作将使用游戏自带的官方 Steam 接口，读
                   '不会代你订阅或取消订阅，也不上传日志和报告。Steam 可能显示游戏正在运行。是否继续？')
 
 LUACS_NOTICE = ('此操作会从 LuaCs 官方 GitHub 发布下载补丁，备份并替换所选游戏目录的客户端文件，'
-                '并启用 C# 脚本。启用后，游戏中的脚本模组具有运行代码的能力，请只使用可信模组。'
+                '保留当前 C# 设置，不自动开启 C#。安装器由 BaroDock 实现，使用官方补丁，提供备份和失败回滚。'
                 '该功能只在你主动选择时运行，不需要管理员权限。是否继续？')
+CSHARP_NOTICE = ('开启 C# 会允许 C# 模组在游戏中执行代码。LuaCs 的 C# 模组没有沙箱，请只使用你信任的模组。'
+                 '此操作只修改所选游戏目录的 LuaCs C# 设置并保存原设置，不下载安装其他文件。是否开启？')
 
 def access_report(env=None, language='zh'):
     game = str(env.game) if env else ('Not detected' if language == 'en' else '尚未检测')
@@ -30,7 +32,7 @@ def access_report(env=None, language='zh'):
             'Writes: selected mod/config changes and backups after your actions; assistant preferences/cache/logs '
             'in your user folders; exports only to the location you choose.',
             'LuaCs: only on explicit confirmation, downloads an official GitHub release, backs up/replaces '
-            'client files, and enables C# scripting. Script mods can run code in the game.',
+            'client files, preserving the existing C# policy. Enabling C# is a separate action; C# mods are not sandboxed.',
             'No wallet/browser credential/firewall inspection, telemetry, or automatic log/report uploads.',
             'No administrator elevation request. This is an ordinary desktop application, not an OS sandbox. '
             'Its code limits access; it cannot sandbox Steam, LuaCs, or other game mods.',
@@ -50,7 +52,7 @@ def access_report(env=None, language='zh'):
         '程序不包含自动订阅或取消订阅的调用；需要你在 Steam 手动订阅。',
         '写入范围：你选择的模组/启用配置及备份；用户目录内的助手设置、缓存和本地日志；'
         '导出文件仅保存到你选择的位置。',
-        'LuaCs 仅在明确确认后下载官方 GitHub 补丁、备份替换客户端文件并启用 C#。脚本模组可以在游戏中运行代码。',
+        'LuaCs 仅在明确确认后下载官方 GitHub 补丁、备份替换客户端文件，保留当前 C# 设置。开启 C# 是独立操作；C# 模组没有沙箱。',
         '不检查钱包、浏览器凭据、防火墙，不遥测，也不自动上传日志或报告。',
         '不请求管理员提权。这是普通桌面程序，并非操作系统沙箱；代码限制自身访问范围，不能替 Steam、LuaCs 或其他模组隔离权限。',
         '详细说明和限制见发布包及公开源码中的 ACCESS_AND_PRIVACY.md。'
