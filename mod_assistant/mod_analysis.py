@@ -32,7 +32,7 @@ SYSTEM_KINDS = {"医疗/状态", "职业/天赋", "任务/事件", "地图/站�
 DEFINITION_TAGS = {"item", "structure", "character", "afflictions", "jobs", "talents",
                    "talenttrees", "missions", "randomevents", "locationtypes",
                    "levelobjectprefabs", "mapgenerationparameters", "outpostconfig", "npcsets"}
-PATH_REF = re.compile(r"%(?:Other)?ModDir:([^%]+)%", re.I)
+PATH_REF = re.compile(r"%ModDir:([^%]+)%", re.I)
 ADDON_NAME = re.compile(r"汉化|翻译|localization|translation|补丁|patch|addon|expansion|rebalance|整合", re.I)
 PREFAB_TAGS = {
     "item": {"item"}, "structure": {"structure"}, "character": {"character"},
@@ -248,12 +248,12 @@ def inspect(mod: Mod, metadata: dict | None = None) -> Features:
         for element in root:
             filename = element.get("file", "")
             for dependency in PATH_REF.findall(filename):
-                if dependency.casefold() not in {value.casefold() for value in (mod.name,*mod.aliases)}:
+                if dependency.casefold() not in {value.casefold() for value in (mod.item_id,mod.name,*mod.aliases)}:
                     result.path_dependencies.add(dependency)
             tag = element.tag.casefold()
             if tag not in DEFINITION_TAGS or not filename.lower().endswith(".xml"):
                 continue
-            path = _resource_path(mod.source, filename, mod.name,mod.aliases)
+            path = _resource_path(mod.source, filename, mod.name,(mod.item_id,*mod.aliases))
             if path is None:
                 result.partial = True
                 continue
@@ -354,10 +354,11 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
         for name in sorted(feature.path_dependencies):
             if name.casefold() in ambiguous:
                 reasons.append('资源路径引用的名称存在多个候选，不能确认依赖：'+name); continue
-            dependency = names.get(name.casefold())
-            if dependency is None or dependency not in active:
-                reasons.append(f"资源路径需要另一模组：{name}（未检测到启用）")
-                severity = 3
+            dependency = name if name in known else names.get(name.casefold())
+            if dependency is None:
+                reasons.append('引用资源包未在助手清单中识别；请核对核心包、已安装目录和实际文件：'+name)
+            else:
+                reasons.append('已记录跨包资源目录引用；不能单凭引用判断启用或顺序要求：'+name)
         if runtime_luacs is False and feature.code_files:
             reasons.append(f"含 {feature.code_files} 个 Lua/C# 文件；本机游戏主程序未检出 LuaCs，脚本功能需先核实")
             severity = max(severity, 3)
@@ -393,14 +394,14 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
         max_signal = max((score for score, _, _ in signals), default=0)
         active_signal = max((score for score, other, _ in signals if other.item_id in active), default=0)
         compatibility = ("低·声明冲突" if declared_conflicts else
-                         "低·缺前置" if missing or declared_missing or any("资源路径需要" in text for text in reasons) else
+                         "低·缺前置" if missing or declared_missing else
                          "低·当前冲突风险" if mod.enabled and active_signal >= 3 else
                          "低·潜在冲突风险" if max_signal >= 3 else
                          "中·当前重叠" if mod.enabled and active_signal >= 2 else
                          "中·潜在重叠" if max_signal >= 2 else
                          "中·需核对" if severity == 1 else
                          "未知·脚本待核实" if feature.code_files else
-                         "未知·资料不足" if feature.partial or feature.opaque_code or any('不能确认依赖' in text for text in reasons) else "未见直接冲突·待实测")
+                         "未知·资料不足" if feature.partial or feature.opaque_code or any('不能确认依赖' in text or '引用资源包未在' in text for text in reasons) else "未见直接冲突·待实测")
         if feature.deferred: compatibility='待刷新·缓存结论'
         result[mod.item_id] = Assessment(mod.item_id, feature.kinds, importance,
                                          compatibility, reasons, max(0, len(mods) - 1), len(signals))
@@ -414,7 +415,8 @@ def pair_detail(left, right, order, other_active=True):
     score, reason = pair_evidence(left, right)
     shared = left.definitions & right.definitions
     winner = ""
-    if shared and shared <= left.overrides | right.overrides:
+    supported=bool(shared) and all(key[:2]==('item','item') for key in shared)
+    if supported and other_active and left.item_id in order and right.item_id in order and shared <= left.overrides | right.overrides:
         left_only = shared <= left.overrides and not shared & right.overrides
         right_only = shared <= right.overrides and not shared & left.overrides
         if left_only: winner = left.name
@@ -430,6 +432,8 @@ def pair_detail(left, right, order, other_active=True):
         advice = '含医疗/状态 Override：具体加载条件可能与物品不同。请核对作者说明和当前游戏版本；助手不单凭上下位置判定覆盖结果。'
     elif winner:
         advice = f"可识别的 XML Override 预计由 {winner} 优先；请确认这符合你的期望，多个 Override 可调整相对顺序。"
+    elif shared and not supported:
+        advice='此内容类型未建立完整加载模型；可查看具体 XML 字段与来源，不按位置猜测最终结果。'
     else:
         advice = "按作者说明核对脚本/覆盖顺序，分组启用实测；助手不会自动禁用模组。"
     locations = []

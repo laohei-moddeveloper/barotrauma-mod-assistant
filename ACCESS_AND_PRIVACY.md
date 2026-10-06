@@ -1,6 +1,6 @@
 # BaroDock — access and privacy / 访问范围与隐私
 
-Applies to **0.9.0** (access changes introduced in 0.7.0). BaroDock is an optional standalone Windows application, distributed through the Workshop; it is not loaded inside the game. It runs as the current user, without requesting administrator elevation. **It is not an operating-system sandbox.** These are limits implemented by our code, not a guarantee that Steam, LuaCs or other mods are isolated.
+Applies to **0.10.0** (access changes introduced in 0.7.0). BaroDock is an optional standalone Windows application, distributed through the Workshop; it is not loaded inside the game. It runs as the current user, without requesting administrator elevation. **It is not an operating-system sandbox.** These are limits implemented by our code, not a guarantee that Steam, LuaCs or other mods are isolated.
 
 ## What changed following community feedback
 
@@ -61,3 +61,9 @@ Production `steam.py` has an explicit binding allowlist for initialization, subs
 Local logs may contain personal details. The error viewer redacts known game/user paths, common credential fields and Steam IDs; it cannot guarantee removal of every personal detail in arbitrary third-party log text. Inspect before sharing. No automatic sharing occurs.
 
 An existing legacy LuaCs runtime's explicit C# choice may be migrated to the modern configuration while updating. This migration is backed up with the runtime transaction. A fresh installation or a stale legacy setting in a vanilla game does not grant C# permission.
+
+## 0.10.0 read-only evidence additions
+
+Explicitly selected campaign saves are streamed with archive/size/XML limits; nothing is extracted or executed. Saving an approved match creates a new native ModLists XML and local association metadata; the save, enabled list and subscriptions stay unchanged. XML comparisons also read selected-game Vanilla resources and report specific fields and a bounded registration model. Log matches can locate current XML, but do not execute or upload text. Rule provenance and exact-version scopes are local; recorded source URLs are not fetched automatically. No runtime dependency, process scanning, credentials, elevation or telemetry is added.
+
+0.10.0：用户选定存档后有界只读检查；保存核对结果仅创建原生清单及助手关联记录，不改存档、启用列表或订阅。XML 对照读取所选游戏的原版资源，日志可以对应当前文件；都不执行第三方代码、不自动上传。规则来源/版本记录保持本地，不自动访问填写的网址。权限边界延续。

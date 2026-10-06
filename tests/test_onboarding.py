@@ -163,7 +163,7 @@ class NetworkAndCacheTests(Fixture):
             if file.is_file() and file.suffix.casefold() in ('.xml','.lua','.cs','.dll'):
                 stat=file.stat();rows.append((file.relative_to(mod.source).as_posix(),stat.st_size,stat.st_mtime_ns,stat.st_ctime_ns))
         legacy=hashlib.sha256(json.dumps([str(mod.source),mod.name,list(mod.aliases),rows,{}],sort_keys=True,ensure_ascii=False).encode()).hexdigest()
-        path=self.env.work/'analysis/features-v3'/ (hashlib.sha256(mod.item_id.encode()).hexdigest()+'.json')
+        path=self.env.work/f'analysis/features-v{SCHEMA}'/ (hashlib.sha256(mod.item_id.encode()).hexdigest()+'.json')
         path.parent.mkdir(parents=True)
         path.write_text(json.dumps({'schema':SCHEMA,'source':str(mod.source),'signature':legacy,'feature':encode(inspect(mod))}))
         with patch('mod_assistant.analysis_cache.inspect',side_effect=AssertionError('unchanged cache should be reused')):

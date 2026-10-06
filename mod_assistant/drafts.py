@@ -4,13 +4,15 @@ from pathlib import Path
 from .core import APP_ID, AssistantError, game_running
 from .mod_toggle import configured_key
 from .mod_order import validate_order, load_rules
-from .profiles import SCHEMA, config_bytes, commit_config
+from .profiles import SCHEMA, config_bytes, commit_config, game_version
+from .rule_evidence import installed_context
 
 
 def commit_draft(env, ids, baseline, original_ids, mods, process_guard=game_running):
     if len(set(ids)) != len(ids) or any(item not in {mod.item_id for mod in mods} for item in ids):
         raise AssistantError('草稿含未知或重复模组，请重新检测。')
-    validate_order(ids, original_ids, load_rules(env))
+    rules=load_rules(env)
+    validate_order(ids,original_ids,rules,installed_context(env,{mod.item_id:mod for mod in mods},rules),game_version(env))
     document = ET.fromstring(baseline)
     core = next((node for node in document.iter() if node.tag.casefold() == 'corepackage'), None)
     if core is None:

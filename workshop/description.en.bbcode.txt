@@ -4,15 +4,14 @@
 BaroDock is a free, standalone Windows 64-bit Barotrauma mod manager: load-order previews and dragging, updates, game presets, backups and XML override comparisons. No Python installation needed. Switch between English and Chinese in the app.
 [b]This Workshop item delivers an external tool. Install it to your desktop; do not enable it as a gameplay mod or require it on your server.[/b]
 
-[h1]0.9.0: revised after player feedback[/h1]
+[h1]0.10.0: order evidence, campaign matching and specific troubleshooting[/h1]
 [list]
-[*][b]Auto-sort preview:[/b] a prominent toolbar action, background calculation and cancellation. Review changed positions, reasons and actual cycle chains before Apply draft. Dragging, undo, locks, explicit rules and local author declarations remain available. Missing dependencies are never enabled or subscribed automatically.
-[*][b]See the actual overrides:[/b] Compare XML overrides in the detailed analysis shows both definitions and a text diff, helping investigate changed fields or build companion patches. Lua/C# files are counted only; script compatibility stays unverified. Regex guesses about script execution were removed.
-[*][b]Find your backups:[/b] open the folder, copy its path or choose a backup location. Failed copies remain visible. Restore staging and retained originals stay on each target drive; legacy snapshots remain supported.
-[*][b]Useful presets and errors:[/b] read/write native game ModLists XML, retain legacy JSON and warn about missing/ambiguous entries. Local error details include operation, version, ID and traceback. Review before sharing; nothing is uploaded automatically.
-[*][b]LuaCs and C# separately:[/b] install/update the official patch while preserving your C# choice. Enable, disable and restore C# settings independently. BaroDock implements verification, backups and failure rollback; LuaCs supplies the patch.
+[*][b]Traceable ordering:[/b] record a rule's reason, source, date and version scope. Stale rules are suspended. Review changes before applying; directory references no longer imply loading priority.
+[*][b]Continue a campaign:[/b] Import list accepts .save files. Review missing or ambiguous names and recorded order, then create a native ModLists preset. Saves and the enabled list remain unchanged; no automatic subscriptions.
+[*][b]Specific XML and log evidence:[/b] inspect fields, Vanilla values, identifiers and files. The Item registration model covers reviewed 1.13.4.0 conditions; Clear, inheritance, other types and scripts are not guessed. Explicit logged errors can link to current XML with repair and reproduction steps.
+[*][b]Clear states and recovery:[/b] C# allow/disable/prompt/unreadable policies are separate from session execution. Keep visible backups, actionable errors, dragging/undo, six management actions and both languages.
 [/list]
-[url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/tag/v0.9.0]Release notes[/url] · [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/docs/reliability-design.md]Design, BMT lessons and official updater review[/url]
+[url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/tag/v0.10.0]Release notes[/url] · [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/docs/evidence-workflows.md]Workflows and supported cases[/url]
 
 [h1]Install and get started[/h1]
 [olist]
@@ -44,6 +43,6 @@ LuaCs C# mods are not sandboxed; use trusted mods. This desktop app is not an OS
 [h1]Suggestions and criticism are welcome[/h1]
 Thank you to players who test, write detailed reports and provide screenshots. How the tool works in your actual setup matters more than the number of features. Awkward workflows, unclear messages, sorting problems and restore failures are welcome in the comments or [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/issues]GitHub Issues[/url]. Include your version, steps and exact error; never send passwords or verification codes. I will check reports carefully and document confirmed fixes, although I cannot promise to resolve every issue immediately.
 
-Current version: [b]0.9.0[/b]. 205 unit/isolated checks, real C/D restoration and failure rollback, and packaged bilingual checks do not cover every computer, mod combination or multiplayer session. Includes guides, access details and SHA-256 checksums. No base-game files, third-party mods or personal configurations are distributed.
+Current version: [b]0.10.0[/b]. 234 unit/isolated checks, real C/D restoration and failure rollback, and packaged bilingual checks do not cover every computer, mod combination or multiplayer session. Includes guides, access details and SHA-256 checksums. No base-game files, third-party mods or personal configurations are distributed.
 
 [b]AI assistance:[/b] AI was used during development. The current cover is an original geometric design drawn in code; earlier artwork used AI assistance.

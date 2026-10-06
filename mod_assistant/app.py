@@ -169,7 +169,11 @@ class App:
         finally:
             self.interface.updating = False
         self.interface.language.set(LANGUAGES[language])
-        for widget in self.root.winfo_children():
+        def descendants(parent):
+            for child in parent.winfo_children():
+                yield child
+                yield from descendants(child)
+        for widget in list(descendants(self.root)):
             refresh = getattr(widget, '_language_refresh', None)
             if refresh and widget.winfo_exists():
                 refresh()
@@ -382,14 +386,14 @@ class App:
                                             lambda item,feature:self.events.put({'kind':'feature_preview','id':item,'feature':feature}))
             detected = luacs_status(env)
             runtime_luacs = detected.runtime
-            assessments = evaluate(mods, features, runtime_luacs, read_order(env,strict=False), detected.csharp) if config_ready else {}
+            assessments = evaluate(mods, features, runtime_luacs, read_order(env,strict=False), detected.permanent_permission) if config_ready else {}
             if not mods:
                 self.events.put({'kind':'log', 'message':'尚未发现订阅或本地模组；新用户的空列表是正常现象，请先在工坊订阅并等待下载。'})
             self.events.put({"kind": "inventory", "env": env, "mods": mods, "online": online,
                              "metadata": metadata, "features": features,
                              "assessments": assessments, "runtime_luacs": runtime_luacs,
                              "game_running": running,
-                             "luacs_status": detected.text, 'runtime_csharp':detected.csharp,
+                             "luacs_status": detected.text, 'runtime_csharp':detected.permanent_permission,
                              'analysis_stats':stats, 'light':light,
                              'config_ready':config_ready, 'scan_timings':{'first_list_seconds':first_list,'complete_seconds':time.monotonic()-started},
                              "metadata_available": metadata_available})
@@ -444,8 +448,9 @@ class App:
         if not path: return
         mods=[data['mod'] for data in self.mods.values()]
         summary=self.last_summary
+        features=dict(self.features)
         def work():
-            report=diagnose(path,mods,self.env)
+            report=diagnose(path,mods,self.env,features,self.cancel)
             lines=[report['file'],redact(report['path'],self.env),'日志修改时间（UTC）：'+report['modified_utc'],
                    f"读取起始字节：{report['byte_offset']} · {report['encoding']}",report['note'],'']
             if report['changed_during_read']: lines.append('日志在读取期间发生变化；可重新选择最新日志再检查。')
@@ -456,6 +461,11 @@ class App:
                 lines += ['['+finding['category']+'] '+position,finding['evidence'],
                           '可能相关模组：'+('、'.join(finding['possible_mods']) or '未确定'),finding['text'],
                           '建议：'+finding['advice'],'']
+                for location in finding['locations']:
+                    lines.append(location['kind']+'：'+location['mod_name']+' ['+location['mod_id']+'] '+location['file'])
+                    if location.get('identifier'): lines.append('标识符：'+location['identifier'])
+                    if location.get('source_line'): lines.append('日志报告的源码行：'+str(location['source_line']))
+                lines+=finding['steps']+['']
             if not report['findings']: lines.append('读取片段未发现已识别的错误关键词；这不代表游戏运行无错误。')
             self.events.put({'kind':'text_report','title':'游戏 / LuaCs 日志诊断','text':'\n'.join(lines)})
         self.work(work)
@@ -682,7 +692,7 @@ class App:
             result = installer.install(refresh=True)
             detected = luacs_status(self.env)
             self.events.put({"kind": "luacs_ready", "result": result,
-                             "status": detected.text, "runtime": detected.runtime, 'csharp':detected.csharp})
+                             "status": detected.text, "runtime": detected.runtime, 'csharp':detected.permanent_permission})
         self.work(install)
 
     def set_csharp(self,enabled):
@@ -693,7 +703,7 @@ class App:
             installer=LuaCsInstaller(self.env,lambda message:self.events.put({'kind':'scan_status','message':message}))
             installer.cancel=self.cancel; result=installer.set_csharp(enabled)
             detected=luacs_status(self.env)
-            self.events.put({'kind':'luacs_ready','result':result,'status':detected.text,'runtime':detected.runtime,'csharp':detected.csharp})
+            self.events.put({'kind':'luacs_ready','result':result,'status':detected.text,'runtime':detected.runtime,'csharp':detected.permanent_permission})
         self.work(configure)
 
     def restore_luacs(self, operation='runtime'):
@@ -711,7 +721,7 @@ class App:
             installer.restore(operation)
             detected = luacs_status(self.env)
             self.events.put({"kind": "luacs_ready", "runtime": detected.runtime,
-                             'csharp':detected.csharp,
+                             'csharp':detected.permanent_permission,
                              "status": detected.text, "result": {
                                  "message": '已恢复最近一次 C# 设置备份' if operation=='csharp' else "已恢复 LuaCs 安装前的文件与设置", "backup": ""}})
         self.work(restore)
@@ -1188,6 +1198,9 @@ def self_check(report_path):
 
 
 def main():
+    if len(sys.argv)==3 and sys.argv[1]=='--evidence-check':
+        from .evidence_check import run
+        run(sys.argv[2]); return
     if len(sys.argv) == 3 and sys.argv[1] == "--self-check":
         self_check(sys.argv[2])
         return

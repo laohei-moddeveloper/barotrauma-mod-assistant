@@ -40,10 +40,10 @@ class OrderTests(unittest.TestCase):
         features = {"101": Features("101", "Base", kinds=("物品/装备",)),
                     "102": Features("102", "LuaCs", kinds=("框架/脚本",)),
                     "103": Features("103", "Base 汉化补丁", kinds=("语言/文本",),
-                                    path_dependencies={"Base"})}
+                                    path_dependencies={"Base"},declared_rules=[{'type':'requirement','id':'101','name':'','condition':'','source':'metadata.xml'}])}
         result = suggest_order(ids, mods, features)
         self.assertEqual(result.ids, ["101", "103", "102"])
-        self.assertIn("资源路径依赖", " ".join(result.reasons))
+        self.assertIn("metadata.xml", " ".join(result.reasons))
 
     def test_save_order_moves_comments_with_packages_and_keeps_other_settings(self):
         self.assertEqual(read_order(self.env), ["103", "101", "102"])
@@ -73,8 +73,8 @@ class OrderTests(unittest.TestCase):
 
     def test_dependency_cycles_rejected_without_writing_configuration(self):
         mods = {item: Mod(item, item, self.env.installed / item) for item in ("101", "102")}
-        features = {"101": Features("101", "101", path_dependencies={"102"}),
-                    "102": Features("102", "102", path_dependencies={"101"})}
+        features = {"101": Features("101", "101",declared_rules=[{'type':'requirement','id':'102','name':'','condition':'','source':'metadata.xml'}]),
+                    "102": Features("102", "102",declared_rules=[{'type':'requirement','id':'101','name':'','condition':'','source':'metadata.xml'}])}
         with self.assertRaisesRegex(AssistantError, "循环"):
             suggest_order(["101", "102"], mods, features)
         self.assertEqual(self.config.read_bytes(), self.original)

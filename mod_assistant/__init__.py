@@ -1,2 +1,2 @@
 """Barotrauma local Workshop mod manager."""
-VERSION = "0.9.0"
+VERSION = "0.10.0"

@@ -263,7 +263,7 @@ class CacheAndEvidenceTests(Fixture):
 
     def test_corrupt_cache_and_no_prior_cache_light_scan(self):
         mod=self.make('101'); inspect_cached(self.env,[mod])
-        path=next((self.env.work/'analysis/features-v3').glob('*.json')); path.write_text('[]')
+        path=next((self.env.work/'analysis/features-v4').glob('*.json')); path.write_text('[]')
         _,stats=inspect_cached(self.env,[mod]); self.assertEqual(stats['scanned'],1)
         path.write_text('{')
         with patch.object(Path,'rglob',side_effect=AssertionError('no tree walk')):

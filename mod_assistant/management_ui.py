@@ -19,7 +19,7 @@ class ManagementDialog:
         self.window=tk.Toplevel(app.root); self.window.title('配置、联机与快照')
         self.window.geometry('940x700'); self.window.minsize(850,640); self.window.configure(bg='#0b1422'); self.window.transient(app.root)
         app.label(self.window,'多套配置 · 联机配齐 · 更新前快照',font=('Microsoft YaHei UI',16,'bold')).pack(anchor='w',padx=18,pady=12)
-        description=app.label(self.window,'先检查清单与差异，再应用。配置只切换启用状态和顺序；快照可恢复保存过的模组文件。',
+        description=app.label(self.window,'先检查清单与差异，再应用。导入清单也可选择战役存档；快照可恢复保存过的模组文件。',
                   fg='#8fa6bf',wraplength=800,justify='left')
         description.pack(anchor='w',padx=18)
         self.window.bind('<Configure>',lambda event:description.configure(wraplength=max(400,event.width-36))
@@ -93,7 +93,10 @@ class ManagementDialog:
             try:
                 reject_link(path)
                 if path.stat().st_size>2*1024*1024: raise AssistantError('模组清单文件过大')
-                data=read_native(self.env,path.read_bytes(),[x['mod'] for x in self.app.mods.values()])
+                raw=path.read_bytes(); data=read_native(self.env,raw,[x['mod'] for x in self.app.mods.values()])
+                from .save_inspector import association_for
+                association=association_for(self.env,raw)
+                if association: data['save_reference']=association
                 self.profiles['xml:'+path.name]=(path,data)
             except (OSError,ValueError,AssistantError) as error:
                 self.profiles['xml:'+path.name]=(path,{'name':path.stem,'order':[],'error':str(error)})
@@ -132,6 +135,7 @@ class ManagementDialog:
                '游戏版本：'+data.get('game_version','未记录'),'普通模组将按下列顺序启用，其他普通模组将禁用：']
         lines += [f"{i}. {x.get('name',x['id'])} · {x.get('mod_version','未记录版本')}" for i,x in enumerate(data['order'],1)]
         if 'native_entries' in data: lines.append('游戏清单不记录版本或指纹；缺失项目不会被静默忽略，应用前会检查。')
+        if data.get('save_reference'): lines.append('来源存档（名称匹配）：'+data['save_reference']['filename'])
         self.set_preview(self.profile_preview,'\n'.join(lines))
 
     def describe_snapshot(self):
@@ -159,8 +163,11 @@ class ManagementDialog:
 
     def import_file(self):
         if self.busy(): return
-        path=self.app.files.askopenfilename(title='选择朋友或自己导出的配置',filetypes=[('模组配置','*.xml *.json')],parent=self.window)
+        path=self.app.files.askopenfilename(title='选择模组清单或战役存档',filetypes=[('清单或战役存档','*.xml *.json *.save'),('战役存档','*.save')],parent=self.window)
         if not path: return
+        if Path(path).suffix.casefold()=='.save':
+            from .save_ui import inspect_selected_save
+            inspect_selected_save(self,path); return
         try:
             if Path(path).stat().st_size>2*1024*1024: raise AssistantError('配置文件过大')
             if Path(path).suffix.casefold()=='.xml':

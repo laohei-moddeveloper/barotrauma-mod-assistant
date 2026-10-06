@@ -1,12 +1,12 @@
-BaroDock v0.9.0
+BaroDock v0.10.0
 
 独立 Windows 64 位工具；工坊负责分发，不需要在游戏里启用，不要作为服务器必需模组。
 1. 运行「安装到桌面.cmd」；或把 BarotraumaModAssistant.exe 复制到自己的文件夹运行。
 2. 右上角 中文 / English 切换语言并保存。完整说明见 使用说明.md / README_EN.md。
 3. 默认本地检测；需要更新时保持 Steam 登录，关闭游戏/服务器，再主动开始更新。
 4. 主工具栏「自动排序（预览）」显示变动与原因，确认后才应用；可以拖动和撤销。
-5. 「模组管理」导入/导出游戏 ModLists XML、检查缺失项及保存/恢复完整快照。
-6. 「工具与脚本」提供 XML 定义对照、日志线索、最近错误详情及 LuaCs。
+5. 「模组管理」导入/导出 ModLists，可在导入时选择战役 .save，先确认同名和缺失项再生成清单。
+6. 「工具与脚本」提供 XML 字段/来源对照、日志文件定位、最近错误详情及 LuaCs。
 7. 安装/更新 LuaCs 保留 C# 选择；开启、关闭和恢复 C# 设置是独立操作。
 8. 备份能打开文件夹、复制路径或选择位置；未完成副本不能自动恢复。
 
@@ -22,8 +22,8 @@ Run Install-to-desktop.cmd, or copy the executable into your own folder. No Pyth
 Switch to English at the top right. Start with README_EN.md.
 Local inspection is the default. Close the game/server before changes; choose online actions explicitly.
 Auto-sort preview shows proposed changes and reasons; review and apply them yourself.
-Mod management offers native game presets, missing-item review and independent file backups.
-Tools offers XML comparisons, log clues, recent error details and LuaCs installation.
+Import list also accepts campaign saves. Confirm missing/ambiguous names before creating a native game preset.
+Tools offers XML field/source comparisons, logged file locations, recent error details and LuaCs installation.
 LuaCs updates preserve the C# choice. Enable, disable and restore C# settings separately.
 After Workshop updates, close the old app and rerun the installer to update the desktop copy.
 

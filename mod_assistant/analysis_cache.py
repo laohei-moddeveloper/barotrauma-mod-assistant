@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from .core import AssistantError, Cancelled, atomic_json, load_package, within, mod_files
 from .mod_analysis import Features, KIND_BY_TAG, inspect
 
-SCHEMA = 3
+SCHEMA = 4
 SETS = {'definitions','overrides','path_dependencies','workshop_dependencies'}
 TUPLE_SETS = {'definitions','overrides'}
 
@@ -67,7 +67,7 @@ def signature(mod, metadata, cancel=None):
 def inspect_cached(env, mods, metadata=None, light=False, force=False, cancel=None, emit=lambda message: None,
                    on_feature=lambda item, feature: None):
     metadata = metadata or {}
-    folder = env.work / 'analysis/features-v3'
+    folder = env.work / 'analysis/features-v4'
     results = {}; stats = {'reused':0,'scanned':0,'deferred':0}
     for mod in mods:
         if cancel and cancel.is_set(): raise Cancelled('分析已停止')

@@ -11,10 +11,11 @@ import time
 import uuid
 import xml.etree.ElementTree as ET
 
-from .core import AssistantError, Cancelled, Environment, Mod, atomic_json, game_running, scoped_game_guard
+from .core import AssistantError, Cancelled, Environment, Mod, atomic_json, game_running, scoped_game_guard,reject_link
 from .mod_analysis import Features
 from .mod_toggle import BLOCK, configured_key
 from .author_rules import rule_context, applicable
+from .rule_evidence import normalize_evidence, effective_rules, evidence_lines
 
 
 @dataclass
@@ -22,6 +23,8 @@ class OrderSuggestion:
     ids: list[str]
     reasons: list[str]
     movements: list[dict] = field(default_factory=list)
+    evidence: list[dict] = field(default_factory=list)
+    coverage: list[str] = field(default_factory=list)
 
 
 def read_order(env: Environment, strict=True) -> list[str]:
@@ -52,7 +55,10 @@ def read_order(env: Environment, strict=True) -> list[str]:
 
 def load_rules(env):
     path = env.work / 'order-rules.json'
-    try: return check_rules(json.loads(path.read_text(encoding='utf-8')))
+    try:
+        reject_link(path)
+        if path.stat().st_size>2*1024*1024: raise AssistantError('排序规则文件过大')
+        return check_rules(json.loads(path.read_text(encoding='utf-8')))
     except FileNotFoundError: return {'before': [], 'locks': []}
     except (ValueError, TypeError): raise AssistantError('排序规则文件损坏，请在规则窗口重建')
 
@@ -62,18 +68,23 @@ def check_rules(data):
     before,locks = data.get('before',[]),data.get('locks',[])
     if not isinstance(before,list) or not isinstance(locks,list) or len(before)>2000 or len(locks)>1000:
         raise AssistantError('排序规则数量或格式无效')
-    if any(not isinstance(pair,list) or len(pair)!=2 or any(not isinstance(x,str) for x in pair) or pair[0]==pair[1] for pair in before):
+    if any(not isinstance(pair,list) or len(pair)!=2 or any(not isinstance(x,str) or len(x)>100 for x in pair) or pair[0]==pair[1] for pair in before):
         raise AssistantError('前后顺序规则无效')
-    if any(not isinstance(x,str) for x in locks): raise AssistantError('锁定规则无效')
-    return {'before':[list(pair) for pair in dict.fromkeys(tuple(x) for x in before)],'locks':list(dict.fromkeys(locks))}
+    if any(not isinstance(x,str) or len(x)>100 for x in locks): raise AssistantError('锁定规则无效')
+    result = {'before':[list(pair) for pair in dict.fromkeys(tuple(x) for x in before)],'locks':list(dict.fromkeys(locks))}
+    if 'evidence' in data:
+        result['evidence'] = normalize_evidence(data['evidence'],result['before'])
+    if len(json.dumps(result,ensure_ascii=False).encode('utf-8'))>2*1024*1024: raise AssistantError('排序规则文件过大')
+    return result
 
 
 def save_rules(env, data):
     atomic_json(env.work/'order-rules.json',check_rules(data))
 
 
-def validate_order(ids, original, rules):
+def validate_order(ids, original, rules, mods=None, game_version=''):
     rules = check_rules(rules)
+    rules,_ = effective_rules(rules,mods or {},game_version)
     for before,after in rules['before']:
         if before in ids and after in ids and ids.index(before)>ids.index(after):
             raise AssistantError('此移动违反自定义前后顺序规则，请先调整规则')
@@ -82,12 +93,13 @@ def validate_order(ids, original, rules):
             raise AssistantError('此移动会改变已锁定模组的位置，请先解锁')
 
 
-def suggest_order(ids: list[str], mods: dict[str, Mod], features: dict[str, Features], rules=None, cancel=None) -> OrderSuggestion:
+def suggest_order(ids: list[str], mods: dict[str, Mod], features: dict[str, Features], rules=None, cancel=None, game_version='') -> OrderSuggestion:
     """Stable suggestion; preserve precedence where definitions already overlap."""
     if len(set(ids)) != len(ids) or any(item not in mods for item in ids):
         raise AssistantError("模组顺序与当前清单不一致，请重新检测")
     selected={item:mods[item] for item in ids}
     names,ambiguous=rule_context(selected)
+    resource_names,resource_ambiguous=rule_context(mods)
     active=set(ids); context=(names,ambiguous,active|set(names))
     edges = {item: set() for item in ids}
     incoming = {item: 0 for item in ids}
@@ -96,6 +108,8 @@ def suggest_order(ids: list[str], mods: dict[str, Mod], features: dict[str, Feat
     def check():
         if cancel and cancel.is_set(): raise Cancelled('排序计算已取消，草稿和游戏配置未改动')
     rules = check_rules(rules or {})
+    rules,rule_evidence = effective_rules(rules,mods,game_version)
+    reasons.extend(evidence_lines(rule_evidence))
     def edge(before, after, reason=''):
         if reason: edge_reasons.setdefault((before,after),reason)
         if before != after and after not in edges[before]:
@@ -124,14 +138,13 @@ def suggest_order(ids: list[str], mods: dict[str, Mod], features: dict[str, Feat
         for dependency in sorted(feature.workshop_dependencies - active):
             reasons.append(f"{mods[item].name} 的工坊前置 {dependency} 不在本列表中，请核实是否由核心包或客户端提供")
         for name in sorted(feature.path_dependencies):
-            if name.casefold() in ambiguous:
+            if name.casefold() in resource_ambiguous:
                 reasons.append(f"{mods[item].name} 引用的 {name} 有多个同名候选，未猜测其排序关系"); continue
-            prerequisite = names.get(name.casefold())
+            prerequisite = name if name in mods else resource_names.get(name.casefold())
             if prerequisite is None:
-                reasons.append(f"{mods[item].name} 引用了 {name}，但它不在已启用列表中")
-            elif prerequisite != item and item not in edges[prerequisite]:
-                reason=f"{mods[prerequisite].name} 排在 {mods[item].name} 前：资源路径依赖"
-                edge(prerequisite, item,reason); reasons.append(reason)
+                reasons.append(f"{mods[item].name} 引用资源包 {name}，助手清单中未识别；请核对核心包和已安装目录")
+            elif prerequisite != item:
+                reasons.append(f"{mods[item].name} 引用 {mods[prerequisite].name} 的资源目录；目录引用不证明需要改变启用顺序")
 
     # Upper packages take precedence for competing overrides. A type/name guess
     # must not silently reverse the user's current choice of the winning mod.
@@ -204,13 +217,24 @@ def suggest_order(ids: list[str], mods: dict[str, Mod], features: dict[str, Feat
         evidence='\n'.join(edge_reasons.get((a,b),a+' → '+b) for a,b in zip(cycle,cycle[1:]))
         raise AssistantError('排序关系形成循环，草稿未改动：\n'+chain+'\n'+evidence)
     if proposed != ids:
-        reasons.append("只根据已识别的资源依赖和前后规则调整，不按模组类型推测顺序；其余尽量保留原顺序。作者说明优先")
+        reasons.append('只依据作者声明、前后规则和锁定调整；资源目录引用不生成排序关系，其余保留原顺序。')
     elif not reasons:
         reasons.append("未发现需要改变顺序的依赖或规则；保留当前顺序，不代表已经证明兼容")
     movements=[{'id':item,'from':position[item]+1,'to':index+1,
                 'reasons':list(dict.fromkeys(reason for (a,b),reason in edge_reasons.items() if item in (a,b)))}
                for index,item in enumerate(proposed) if position[item]!=index]
-    return OrderSuggestion(proposed, reasons,movements)
+    connected={item for before,after in edge_reasons for item in (before,after)}
+    coverage=[]
+    for item in ids:
+        feature=features.get(item)
+        if feature is None or feature.partial or feature.deferred:
+            coverage.append(mods[item].name+'：分析不完整或待刷新，排序证据不足')
+        elif item not in connected:
+            coverage.append(mods[item].name+'：没有已识别的顺序关系，保留位置不代表验证通过')
+        if feature and (feature.code_files or feature.opaque_code):
+            coverage.append(mods[item].name+'：脚本运行行为未验证')
+    coverage.append('作者声明和手工规则提供顺序依据；目录引用仅是资源线索，保留原顺序不是实测证据。')
+    return OrderSuggestion(proposed,reasons,movements,rule_evidence,coverage)
 
 
 def save_order(env: Environment, ids: list[str], process_guard=game_running) -> str:
@@ -218,7 +242,9 @@ def save_order(env: Environment, ids: list[str], process_guard=game_running) -> 
     if process_guard():
         raise AssistantError("请先关闭游戏和服务器，再保存模组顺序")
     current = read_order(env)
-    validate_order(ids,current,load_rules(env))
+    from .core import inventory
+    from .profiles import game_version
+    validate_order(ids,current,load_rules(env),{mod.item_id:mod for mod in inventory(env)},game_version(env))
     if len(ids) != len(current) or set(ids) != set(current) or len(set(ids)) != len(ids):
         raise AssistantError("启用模组清单已经变化，请重新检测后排序")
     if ids == current:

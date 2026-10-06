@@ -88,32 +88,52 @@ def restore_info(env: Environment, operation='runtime') -> RestoreInfo:
 
 @dataclass
 class LuaCsStatus:
+    # csharp is the permanent-allow setting, not session execution state.
     runtime: bool
     csharp: bool
     text: str
+    policy: str = 'Unknown'
+
+    @property
+    def permanent_permission(self):
+        return self.csharp if self.policy in ('Enabled','Disabled') else None
 
 
 def status(env: Environment) -> LuaCsStatus:
+    policy='Unknown'
+    def read_settings(path):
+        from .xml_compare import DefinitionTree
+        for parent in [path,*path.parents]:
+            if within(parent,env.game): reject_link(parent)
+        with path.open('rb') as stream: data=stream.read(2*1024*1024+1)
+        if len(data)>2*1024*1024: raise AssistantError('LuaCs 设置超过读取上限')
+        return ET.fromstring(data,parser=ET.XMLParser(target=DefinitionTree()))
     try:
+        for name in ('Barotrauma.dll','BarotraumaCore.dll','MoonSharp.Interpreter.dll'): reject_link(env.game/name)
         assembly = (env.game / "Barotrauma.dll").read_bytes()
         runtime = b"LuaCs" in assembly and all(
             (env.game / name).is_file() for name in ("BarotraumaCore.dll", "MoonSharp.Interpreter.dll"))
-    except OSError:
+    except (OSError,AssistantError):
         assembly = b""
         runtime = False
     try:
         if b"CsRunPolicy" in assembly or (env.game / MODERN_SETTINGS).exists():
-            root = ET.fromstring((env.game / MODERN_SETTINGS).read_bytes())
+            root = read_settings(env.game/MODERN_SETTINGS)
+            if root.tag!='Configuration': raise AssistantError('LuaCs 新版设置格式不受支持')
             setting = root.find("LuaCsForBarotrauma/CsRunPolicy")
-            csharp = setting is not None and setting.get("Value", "").casefold() == "enabled"
+            value=setting.get('Value','').casefold() if setting is not None else ''
+            policy={'enabled':'Enabled','disabled':'Disabled','prompt':'Prompt'}.get(value,'Unknown')
+            csharp = policy=='Enabled'
         else:
-            root = ET.fromstring((env.game / "LuaCsSetupConfig.xml").read_bytes())
+            root = read_settings(env.game/'LuaCsSetupConfig.xml')
+            if root.tag!='LuaCsSetupConfig': raise AssistantError('LuaCs 设置格式不受支持')
             csharp = root.get("EnableCsScripting", "false").casefold() == "true"
-    except (OSError, ET.ParseError):
+            policy='Enabled' if csharp else 'Disabled'
+    except (OSError, ET.ParseError,AssistantError):
         csharp = False
-    text = "LuaCs 已安装 · C# 已开启" if runtime and csharp else (
-        "LuaCs 已安装 · C# 未开启" if runtime else "LuaCs 客户端未完整检出")
-    return LuaCsStatus(runtime, csharp, text)
+    label={'Enabled':'C# 永久允许','Disabled':'C# 永久禁用','Prompt':'C# 每次询问','Unknown':'C# 设置未能读取'}[policy]
+    text=('检出 LuaCs 文件线索' if runtime else 'LuaCs 客户端未完整检出')+' · '+label+'；当前会话与实际运行未验证'
+    return LuaCsStatus(runtime,csharp,text,policy)
 
 
 def release_info() -> dict:

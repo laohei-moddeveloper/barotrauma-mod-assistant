@@ -1,5 +1,14 @@
 # 版本记录
 
+## 0.10.0
+
+- 排序规则可记录出处、理由、日期和精确版本范围；版本过期/读取未知时暂停对应规则并解释。纠正目录引用被当成顺序前置的推断，支持自己的工坊编号路径宏并刷新旧分析缓存。
+- 从原有导入入口只读检查战役存档；流式、有界读取真正的 gamesession 条目，确认同名项目，预览后保存原生 ModLists 和独立关联记录。
+- XML 对照增加字段/基线/文件来源，解释少量已审阅 Item 属性和 1.13.4.0 Item 注册模型；重复普通定义与整份 Override 选取分开处理，Clear/继承/未审阅类型不猜。
+- 日志明确错误可核对当前 XML 标识与文件；无关数字不归因模组。处理步骤说明仅新增 Override 不能消除多个普通注册，并区分日志提及、当前文件和实际根因。
+- LuaCs 状态区分允许/禁用/询问/读取未知，只报告静态文件线索；不把文件存在或永久策略当作会话执行证明。
+- 保留六个管理操作，中英文嵌套窗口即时更新并保留 XML 原值。独立 EXE 隔离流程检查不联网、不启动游戏、不修改现有启用列表。验证与尚未实测的场景见工作流程说明。
+
 ## 0.9.0
 
 This revision follows the detailed report in [Issue #1](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/issues/1) and the BMT workflow discussion.
