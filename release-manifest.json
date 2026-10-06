@@ -5,8 +5,8 @@
     "zh",
     "en"
   ],
-  "release_state": "approved_release_prepared",
-  "prepared_at_utc": "2026-10-06T02:43:39.347617+00:00",
+  "release_state": "release",
+  "prepared_at_utc": "2026-10-06T02:52:08.790324+00:00",
   "unit_tests_passed": 234,
   "packaged_self_check": true,
   "historical_binary_rebuilt": false,
@@ -34,26 +34,31 @@
     "bilingual_ui_checked": true,
     "no_runtime_dependency_added": true,
     "clean_windows_ci": {
-      "run": false,
-      "reason": "awaiting source push"
+      "run": true,
+      "passed": true,
+      "url": "https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/actions/runs/37405659238",
+      "source_commit": "ca17b982a5756532afe7eb0e67203959192ff920",
+      "unit_tests_passed": 234
     },
     "gameplay_verified": false,
     "fresh_windows_steam_installation_tested": false,
     "CSharp_semantic_analysis": false,
-    "malware_detection": false
+    "malware_detection": false,
+    "actual_cross_volume_restore_and_rollback": true,
+    "isolated_bilingual_installer": true
   },
   "executable": {
     "name": "BarotraumaModAssistant.exe",
-    "bytes": 13618872,
-    "sha256": "f2c63228fdae282acb4029004e669ff4b384e6e181e015bf0e86f35b76e2a460"
+    "bytes": 13618248,
+    "sha256": "6fa8f63ec8579e2ed4a77bb2c4cae6c730848bb2c3d0b1f8a1708c4e122afe0d"
   },
   "archive": {
     "name": "BarotraumaModAssistant-v0.10.0-win64.zip",
-    "bytes": 13364411,
-    "sha256": "7c57849e231a689fae4a10906156df9a3156be4dd309fa35c524980d465c2cd1"
+    "bytes": 13363863,
+    "sha256": "a994c6315a10ecba9e3529c48edf5d10887dd5ddf98bd5f8023641a7f6acc7a1"
   },
   "sources": {
-    "mod_assistant/__init__.py": "c8e8404d3566def361b24160f549c5e76b1dd06a420d3e0a44aa1142e30de9d5",
+    "mod_assistant/__init__.py": "05829ca4f16ec46bc262350b71e580287c858e08d586aec9c45d515f3bf12a7f",
     "mod_assistant/access.py": "632c11aab7925dc9e9cd4a8c53f3a46d2689e432ea6cbbd61c8971b9fcca1708",
     "mod_assistant/analysis_cache.py": "519c3e0cc7bf2e6e89a3dd1f503ebdbfddadf63b45db4bdae79f1e9e64e437dc",
     "mod_assistant/app.py": "ca02e8d6d85251eb06d92c883f92e51095735b4b9f595e6c13c2fed2e9f98a4d",
