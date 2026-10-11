@@ -1,10 +1,8 @@
 # BaroDock｜潜渊症模组管理
 
-面向 Windows 64 位 Steam 版《潜渊症》（Barotrauma）的独立模组管理工具。当前版本 **0.10.0**。
+面向 Windows 64 位 Steam 版《潜渊症》（Barotrauma）的独立模组管理工具。当前版本 **1.0.0**。
 
-本分支正在验证 **0.11.0-preview.1**，尚未替换公开稳定版。新排查记录、文件依据、Item 继承/覆盖结果、兼容草稿和可选游戏内观察见 [排查工作流](docs/investigation-workflows.md)。
-
-0.10.0 增加可追溯的排序依据、只读战役存档关联及具体 XML/日志定位，纠正目录引用被当成加载顺序的推断。实现和适用边界见 [工作流程说明](docs/evidence-workflows.md)。
+自动排序预览、模组更新、配置备份和具体排错：记录实际文件依据，查看 Item 继承与覆盖结果、生成修复或字段草稿，并核对新日志和可选游戏内观察。无需 Python，可切换中文/English。完整操作与边界见 [排查工作流](docs/investigation-workflows.md)和 [存档关联说明](docs/evidence-workflows.md)。
 
 [English guide](README_EN.md) · 程序右上角可在「中文 / English」之间实时切换，自动保存语言选择。
 

@@ -1,10 +1,8 @@
 # BaroDock | Barotrauma Mod Manager
 
-Version **0.10.0** is a standalone mod manager for the Steam version of Barotrauma on **64-bit Windows**, with **English and Simplified Chinese** interfaces.
+Version **1.0.0** is a standalone mod manager for the Steam version of Barotrauma on **64-bit Windows**, with **English and Simplified Chinese** interfaces.
 
-This branch contains the local **0.11.0-preview.1** build; it has not replaced the published stable release. See [investigation workflows and verification limits](docs/investigation-workflows.md) for file evidence, Item inheritance/results, companion drafts and the optional in-game observer.
-
-0.10.0 adds traceable ordering evidence, read-only campaign matching and specific XML/log investigation, and corrects directory references being treated as load-order prerequisites. See [workflows and supported cases](docs/evidence-workflows.md).
+Review automatic sorting, update mods, keep presets and backups, and investigate specific problems using file evidence, Item inheritance/results, repair or companion drafts, fresh logs and optional in-game observations. Python is not required. See [investigation workflows and limits](docs/investigation-workflows.md) and [campaign matching](docs/evidence-workflows.md).
 
 [Download](https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/latest) · [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3812360206&l=english) · [中文说明](使用说明.md)
 

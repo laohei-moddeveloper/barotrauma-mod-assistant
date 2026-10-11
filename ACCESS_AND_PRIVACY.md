@@ -1,6 +1,6 @@
 # BaroDock — access and privacy / 访问范围与隐私
 
-Applies to **0.10.0** (access changes introduced in 0.7.0). BaroDock is an optional standalone Windows application, distributed through the Workshop; it is not loaded inside the game. It runs as the current user, without requesting administrator elevation. **It is not an operating-system sandbox.** These are limits implemented by our code, not a guarantee that Steam, LuaCs or other mods are isolated.
+Applies to **1.0.0** (access changes introduced in 0.7.0). BaroDock is an optional standalone Windows application, distributed through the Workshop; it is not loaded inside the game. It runs as the current user, without requesting administrator elevation. **It is not an operating-system sandbox.** These are limits implemented by our code, not a guarantee that Steam, LuaCs or other mods are isolated.
 
 ## What changed following community feedback
 
@@ -67,3 +67,9 @@ An existing legacy LuaCs runtime's explicit C# choice may be migrated to the mod
 Explicitly selected campaign saves are streamed with archive/size/XML limits; nothing is extracted or executed. Saving an approved match creates a new native ModLists XML and local association metadata; the save, enabled list and subscriptions stay unchanged. XML comparisons also read selected-game Vanilla resources and report specific fields and a bounded registration model. Log matches can locate current XML, but do not execute or upload text. Rule provenance and exact-version scopes are local; recorded source URLs are not fetched automatically. No runtime dependency, process scanning, credentials, elevation or telemetry is added.
 
 0.10.0：用户选定存档后有界只读检查；保存核对结果仅创建原生清单及助手关联记录，不改存档、启用列表或订阅。XML 对照读取所选游戏的原版资源，日志可以对应当前文件；都不执行第三方代码、不自动上传。规则来源/版本记录保持本地，不自动访问填写的网址。权限边界延续。
+
+## 1.0 local investigation / 本地排查
+
+User-triggered scene records hash selected XML/Lua/C#/DLL bytes, core inputs and relevant runtime/settings. Repair presets and companion drafts are new files in the stated game/assistant locations; original Workshop files are not overwritten automatically. The optional Lua observer is created only after an explicit request, never enabled automatically, and uses game APIs to write its own local JSON. Import treats paths as matching labels and does not open arbitrary imported locations. No cloud upload, system scan or production dependency is added.
+
+1.0：现场记录与规则文件依据只读相关字节；修复与字段草稿新建文件，不自动覆盖工坊内容或启用清单。可选 Lua 观察模块由用户明确创建并自行启用，仅使用游戏 API、写入自身目录；导入路径仅作匹配标签，不据此打开其他目录。复现步骤是用户原文，分享前自行检查隐私；无自动上传。

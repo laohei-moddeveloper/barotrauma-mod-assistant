@@ -1,48 +1,43 @@
 [b]源码与下载：[/b][url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant]GitHub 公开仓库[/url] · [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/latest]最新版本[/url]
 
-[h1]让模组整理少一点折腾[/h1]
-BaroDock 是免费的独立 Windows 64 位潜渊症模组管理工具：排序预览与拖动、模组更新、游戏清单及备份、XML 覆盖对照。无需 Python，界面可切换中文/English。
-[b]这是工具分发包，安装到桌面后运行，无需在游戏中启用，也无需服务器安装。[/b]
+[h1]自动排序有依据，排错看证据[/h1]
+BaroDock 1.0 是免费的独立 Windows 64 位潜渊症模组助手：整理加载顺序、更新模组、保存配置，并把覆盖与日志问题定位到具体内容。中文 / English 即时切换，无需安装 Python。
+[b]这是工具分发包。安装到桌面后运行，不需要在游戏中启用，也无需服务器安装。[/b]
 
-[h1]0.10.0：排序依据、存档关联与具体排查[/h1]
+[h1]可以帮你做什么[/h1]
 [list]
-[*][b]有出处的排序：[/b]前后规则可记录理由、来源、日期和适用版本。过期规则暂停；预览展示变化与依据，目录引用不再被误当作必须排前的关系。
-[*][b]继续旧战役：[/b]在“导入清单”选择 .save，只读核对缺失/同名项目和记录顺序，确认后生成原生 ModLists；不改存档、不自动应用或订阅。
-[*][b]具体 XML 与日志：[/b]查看双方/原版字段和来源文件，定位同标识注册。当前 Item 模型限已审阅的 1.13.4.0 条件；Clear、继承、其他类型与脚本不猜。运行后明确错误能核对当前文件，提供处理与重现步骤。
-[*][b]清楚的状态与恢复：[/b]C# 区分允许/禁用/询问/读取未知；文件线索不冒充运行证明。保留备份、错误详情、拖动/撤销、六个管理操作和双语界面。
+[*][b]自动排序与拖动：[/b]结合作者声明、前后规则与锁定，先展示变化和理由，再由你审核应用。支持撤销；不把“补丁”名称或类型当作强制顺序。
+[*][b]具体排错：[/b]对照 XML 标识、字段与文件来源，解释已审阅 Item 的继承、Clear、注册错误和没有进入结果的修改。日志归并完整异常块，保留最早错误。
+[*][b]更新后重新核对：[/b]规则可记录来源、版本与实际文件摘要；版本号没变、文件变了，也能暂停旧依据并说明变化。
+[*][b]修复与复查：[/b]主动保存现场和复现步骤，生成待审核的原生修复清单或字段兼容草稿；测试后读取新日志。可选只读 Lua 观察模块用于核对游戏实际加载包和选定物品。
+[*][b]清单与恢复：[/b]游戏原生 ModLists、只读战役匹配、快照与恢复、反向依赖查询、本地标记。配置、存档、快照和 LuaCs 备份的范围分别说明。
+[*][b]更新与脚本工具：[/b]并发更新请求和安装调度，失败重试；官方 LuaCs 客户端安装/更新与 C# 许可独立管理。更新不会默认打开 C#。
 [/list]
-[url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/tag/v0.10.0]更新说明[/url] · [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/docs/evidence-workflows.md]工作流程与适用范围[/url]
+[url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/tag/v1.0.0]1.0 更新说明[/url] · [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/docs/investigation-workflows.md]操作流程与适用范围[/url]
 
 [h1]安装与首次使用[/h1]
 [olist]
-[*]订阅，等待 Steam 下载完成；如安装目录还没有生成，启动游戏到主菜单，再退出。
+[*]订阅并等待 Steam 下载。若安装目录尚未生成，启动游戏到主菜单，再退出。
 [*]按 Win+R，打开：
 [code]%LOCALAPPDATA%\Daedalic Entertainment GmbH\Barotrauma\WorkshopMods\Installed\__WORKSHOP_ID__[/code]
 [*]双击「安装到桌面.cmd」，或复制 BarotraumaModAssistant.exe 到自己的文件夹运行。
 [/olist]
-找不到上述目录：在 Steam 浏览游戏本地文件，返回 steamapps，查看下载所在库的：
-[code]workshop\content\602960\__WORKSHOP_ID__[/code]
-桌面副本在 [code]%LOCALAPPDATA%\BarotraumaModAssistant\WorkshopProgram[/code]
-[b]工坊更新后需退出旧助手，重新运行安装脚本或覆盖桌面程序。[/b]Steam 不会自动替换桌面副本；取消订阅也不会移除副本及设置。
+找不到目录时，在游戏安装所在的 Steam 库查看：
+[code]steamapps\workshop\content\602960\__WORKSHOP_ID__[/code]
+桌面副本位于 [code]%LOCALAPPDATA%\BarotraumaModAssistant\WorkshopProgram[/code]
+[b]工坊更新后，请退出旧助手并重新运行安装脚本，或替换桌面副本。[/b]Steam 不会自动更新这个单独的副本；你的个人设置会保留。
 
 [h1]日常使用[/h1]
-[olist]
-[*]先关闭游戏和服务器。默认本地检测；「联网检测」和更新需你主动选择，并保持 Steam 登录。
-[*]「更新」勾选参与任务的项目，「启用」决定游戏加载，两者独立。点「开始并行更新」，或先预览排序再确认应用。
-[*]配置窗口保存/导入游戏清单，查看缺项和差异。缺失工坊项目在 Steam 手动订阅后再「下载并应用」；本地包另行安装。
-[*]保存经过验证的快照；需要时先检查恢复范围。LuaCs 客户端备份与模组快照独立。
-[*]工具页有 LuaCs、XML 分析、日志、错误详情和报告；设置页有主题、字号、密度与并发参数。
-[/olist]
+先关闭游戏和服务器，再更新、切换清单或修改文件。“更新”勾选和“启用”开关分开控制。点主窗口“自动排序（预览）”查看变化；选中一项后“完整分析 → XML 覆盖对照”查看具体内容。工具页的“日志诊断”集中管理现场、修复草稿和复查。缺失工坊项目由你在 Steam 手动订阅，本地包另行安装。
 
-[h1]用途与限制，请先了解[/h1]
-Steam 决定实际下载调度，不能保证突破队列、服务器或带宽限制；已接受的下载可能在停止任务后继续。静态 XML 和依赖提示不证明游戏内兼容，也不检测恶意代码；作者说明和实测优先。「影响范围」不是质量评分。游戏 XML 清单不含版本/指纹，不能获得历史版本；旧 JSON 和导出的联机 JSON 保留其已记录信息。快照占用空间，只恢复保存过的文件，不改变订阅、Steam 缓存或 LuaCs。
+[h1]清楚说明边界[/h1]
+Steam 决定实际下载队列与带宽，助手不能保证突破其限制。模型和文件证据不认证所有脚本、构造行为、模组安全或全部兼容；未审阅类型不套用 Item 的结论。草稿需要审核和独立测试，不会自动修好所有问题，也不能从旧存档重建不存在的历史模组版本。
 
-[b]访问范围：[/b]所选游戏目录、当前用户游戏文件、Steam 游戏清单及助手数据；联网通过官方接口查询潜渊症订阅/下载与公开项目资料。Steam 可能显示游戏正在运行。无进程遍历、进程内存读取、自动订阅/退订、钱包/凭据/防火墙检查、遥测或管理员提权。
-LuaCs 的 C# 模组没有沙箱，请只使用可信模组；普通桌面程序也不是系统沙箱。分享日志前检查个人信息。[url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/ACCESS_AND_PRIVACY.md]详细访问说明[/url]
+1.0 的可选观察模块已在本机真实 LuaCs 客户端试玩回合验证，成功核对包顺序及所查询物品，并修复小数时间戳导入问题。其他电脑与全部联机组合仍需要实际反馈。完整验证范围见 [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/docs/validation.md]验证说明[/url]。
+
+[b]访问范围：[/b]所选游戏、当前用户游戏文件、Steam 游戏清单与助手数据；联网与写入由你明确操作。无进程遍历、进程内存读取、自动订阅/退订、钱包/凭据/防火墙检查、遥测或管理员提权。C# 模组和普通桌面程序不是系统沙箱。分享日志和复现步骤前请检查个人信息。[url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/ACCESS_AND_PRIVACY.md]详细访问说明[/url]
 
 [h1]欢迎建议，也欢迎指出不足[/h1]
-感谢愿意花时间测试、写长反馈和提供图片的玩家。你的实际使用体验比功能数量重要；不顺手的流程、无法理解的提示、排序或恢复问题，都欢迎在评论区或 [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/issues]GitHub Issues[/url] 告诉我。请附版本、操作步骤与错误文字，不要发送密码或验证码。我会认真核对，已确认的修订会写进更新记录，但不能承诺马上解决所有问题。
+感谢愿意认真测试、写长反馈和提供图片的玩家。你的实际使用体验比功能数量重要：哪里不好找、哪条提示说不清、排序或恢复哪里没有帮到你，都欢迎在评论或 [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/issues]GitHub Issues[/url] 告诉我。请附版本、步骤和错误文字，不要发密码、验证码或未检查隐私的完整日志。我会核对并记录修订，认真吸收意见。
 
-当前 [b]0.10.0[/b]：234 项单元/隔离检查、实际 C/D 恢复与失败回滚及打包双语检查；不等于覆盖所有电脑、模组组合或真实联机。包含指南、访问说明和 SHA-256 校验，不分发游戏原文件、第三方模组或个人配置。
-
-[b]AI 辅助说明：[/b]开发使用 AI 辅助；当前封面为代码绘制的原创几何布局，早期封面曾使用 AI 辅助。
+[b]AI 辅助说明：[/b]开发及部分制作使用 AI 辅助；当前几何封面由代码绘制，早期封面曾使用 AI 辅助。

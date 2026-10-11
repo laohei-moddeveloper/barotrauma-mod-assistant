@@ -1,6 +1,6 @@
 # 排查工作流 / Investigation workflows
 
-0.11.0-preview.1 是本地验证预览。本页说明新功能的使用和边界；公开稳定版仍为 0.10.0。
+1.0.0 正式版。本页说明功能的使用、实现依据和实际验证边界。
 
 ## 玩家希望省掉哪些麻烦
 
@@ -83,11 +83,11 @@ Health 默认值、上限及 MaxStackSize 默认值、1–63 范围按公开源�
 
 加载规则来自 [公开游戏源码快照](https://github.com/FakeFishGames/Barotrauma/tree/e6e95da83b1b5ca8b55ec52653c7cf6b40e30247)；公开快照不证明与某个已安装二进制完全相同。模型作为针对当前审核范围的检查使用，不能认证整个游戏启动或所有模组兼容。非 ASCII / 旧式自动生成 Item 标识、未覆盖数值格式、医疗/状态等其他加载类型不套用 Item 的确定结果。
 
-10 个继承最小样本与公开源码中的 C# XML 合成函数结果一致；Lua 5.2 在隔离 API 适配器下执行并验证输出；中英文小窗口、实际字节哈希、修复草稿和复查流程有隔离验证。可选诊断模块尚未完成真实 LuaCs 客户端回合验证，其他真实电脑及真实联机组合也未实测。因此这仍是预览，不将它包装为完整认证。
+10 个继承最小样本与公开源码中的 C# XML 合成函数结果一致；Lua 5.2 在隔离 API 适配器下执行并验证输出；中英文小窗口、实际字节哈希、修复草稿和复查流程有隔离验证。可选诊断模块已在本机真实 LuaCs 客户端的潜艇编辑器试玩回合验证：27 个内容包与配置顺序匹配，原版 wrench 的提供者及 Health / MaxStackSize 成功读取，测试后原清单与原版潜艇哈希保持一致。修复了真实环境 os.time() 返回小数导致导入失败的问题。其他真实电脑、构造行为和真实联机组合仍未完全实测，不作完整认证。
 
 ## English quick guide
 
-This is a local 0.11.0-preview.1 build; the published stable release remains 0.10.0.
+These workflows apply to the 1.0.0 release.
 
 - Right-click an installed mod and choose **Mods that require or reference this mod**. Explicit declarations include inactive and conditional entries; absence of declarations does not prove independence.
 - Open **XML override comparison**, compare a shared Item definition and inspect the selected provider, inherited fields and lost changes. Normal overrides are distinct from duplicate ordinary registration.
@@ -96,4 +96,4 @@ This is a local 0.11.0-preview.1 build; the published stable release remains 0.1
 - **More analysis → Create optional in-game diagnostic module** creates an unenabled local Lua observer. Enable it yourself with a working LuaCs client, start a separate test round, then import its JSON output. The observer reads game APIs and writes only its own file. It does not enable C#, launch the game, inspect other processes or upload data.
 - Records hash actual XML/Lua/C#/DLL bytes, core inputs and selected runtime settings. Same version numbers do not conceal changed files. Large/partial/unsteady logs do not certify error disappearance; an appended log requires exact prefix verification.
 
-The reviewed model covers Item registration/XML composition and a small set of property setters, not scripts, prefab constructors or universal compatibility. The Lua observer has isolated execution tests but still needs a real LuaCs client round test. Exported reproduction notes remain user text: review them before sharing.
+The reviewed model covers Item registration/XML composition and a small set of property setters, not scripts, prefab constructors or universal compatibility. The Lua observer passed a real LuaCs client test round on this machine, including package order and selected Item fields; other machines and complete mod combinations remain unverified. Exported reproduction notes remain user text: review them before sharing.

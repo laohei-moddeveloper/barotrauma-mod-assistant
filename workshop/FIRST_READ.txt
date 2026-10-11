@@ -1,4 +1,4 @@
-BaroDock v0.10.0
+BaroDock v1.0.0
 
 独立 Windows 64 位工具；工坊负责分发，不需要在游戏里启用，不要作为服务器必需模组。
 1. 运行「安装到桌面.cmd」；或把 BarotraumaModAssistant.exe 复制到自己的文件夹运行。

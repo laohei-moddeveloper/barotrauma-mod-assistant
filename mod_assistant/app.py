@@ -577,15 +577,16 @@ class App:
             mod = data["mod"]
             assessment = self.assessments.get(mod.item_id)
             if assessment:
-                self.detail.set(mod.name + "  ·  类型：" + "、".join(assessment.kinds) +
-                                "  ·  角色依据：" + assessment.importance +
-                                "  ·  兼容性：" + assessment.compatibility +
-                                f"（已比对 {assessment.compared} 个其他模组）\n" +
-                                "；".join(assessment.reasons[:2]) +
+                self.detail.set_literal(mod.name + "  ·  "+self.tr('类型：') + ", ".join(self.tr(kind) for kind in assessment.kinds) +
+                                "  ·  "+self.tr('角色依据：') + self.tr(assessment.importance) +
+                                "  ·  "+self.tr('兼容性：') + self.tr(assessment.compatibility) +
+                                self.tr('（已比对 {0} 个其他模组）').format(assessment.compared)+"\n" +
+                                "; ".join(self.tr(reason) for reason in assessment.reasons[:2]) +
                                 ('\n'+self.tr('本地标记：{0}').format(self.settings.get('mod_labels',{}).get(mod.item_id,'')) if self.settings.get('mod_labels',{}).get(mod.item_id) else '')+
-                                ("\n" + data["detail"] if data["detail"] else ""))
+                                ("\n" + self.tr(data["detail"]) if data["detail"] else ""))
             else:
-                self.detail.set(mod.name + "  ·  " + data["stage"])
+                self.detail.set_literal(mod.name + "  ·  " + self.tr(data["stage"]))
+        else:self.detail.set('')
 
     def set_mod_label(self):
         selected=self.tree.selection()

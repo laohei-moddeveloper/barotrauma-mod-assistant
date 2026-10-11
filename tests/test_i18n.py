@@ -72,6 +72,15 @@ class TranslationTests(unittest.TestCase):
 
 
 class LanguageUiTests(test_ui.UiTests):
+    def test_detail_translates_composed_labels_and_preserves_catalog_like_mod_name(self):
+        app=self.app;app.mods['101']['mod'].name='其他'
+        app.features['101'].name='其他';app.features['101'].code_files=2;app.runtime_luacs=False
+        app.assessments=app.evaluate_current();app.tree.selection_set('101');app.set_language('en',persist=False)
+        shown=app.detail.rendered
+        self.assertTrue(shown.startswith('其他  ·  '))
+        self.assertIn('Compatibility:',shown);self.assertIn('compared with',shown)
+        self.assertFalse(__import__('re').search('[\u4e00-\u9fff]',shown.replace('其他','')))
+        app.set_language('zh',persist=False);self.assertIn('兼容性：',app.detail.rendered)
     test_drag_preview_respects_lock_and_never_writes_live_order=None
     test_manager_callback_and_operation_result_are_handled=None
     test_rule_editor_and_luacs_report_open=None

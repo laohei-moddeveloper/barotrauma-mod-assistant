@@ -101,7 +101,7 @@ def inspect_cached(env, mods, metadata=None, light=False, force=False, cancel=No
                 feature = cached; stats['reused'] += 1
             else:
                 emit('分析变化的模组：'+mod.name)
-                feature = inspect(mod,entry); stats['scanned'] += 1
+                feature = inspect(mod,entry,cancel=cancel); stats['scanned'] += 1
                 try:
                     atomic_json(path,{'schema':SCHEMA,'source':str(mod.source),'signature':current,'feature':encode(feature)})
                 except OSError:

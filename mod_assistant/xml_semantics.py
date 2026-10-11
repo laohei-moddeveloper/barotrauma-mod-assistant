@@ -42,7 +42,7 @@ def load_tree(folder,relative,check):
         before=os.fstat(stream.fileno()); data=stream.read(8_000_001); after=os.fstat(stream.fileno())
     if (before.st_size,before.st_mtime_ns)!=(after.st_size,after.st_mtime_ns): raise AssistantError('XML 文件在读取时变化，请重新分析')
     if len(data)>8_000_000: raise AssistantError('XML 对照文件过大，请在编辑器中查看')
-    return ET.fromstring(data,parser=ET.XMLParser(target=DefinitionTree())),len(data)
+    return ET.fromstring(data,parser=ET.XMLParser(target=DefinitionTree(check))),len(data)
 
 
 def records(folder,feature,key,check,load=load_tree):

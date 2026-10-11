@@ -934,7 +934,7 @@ EN.update({
 })
 
 EN.update({
-    '角色依据':'Role evidence','角色依据：':'Role evidence: ',
+    '角色依据':'Role','角色依据：':'Role evidence: ',
     '  ·  角色依据：':'  ·  Role evidence: ','游戏版本':'Game version',
     '排查草稿 · ':'Investigation draft · ','文件依据：{0} · {1} · {2}':'File evidence: {0} · {1} · {2}',
     '核心内容包':'Core content package','声明的前置':'Declared prerequisite',
@@ -1109,4 +1109,6 @@ EN.update({
     '记录文件证据：{0}/{1} · {2}':'Recording file evidence: {0}/{1} · {2}',
     '记录核心内容与脚本设置…':'Recording core content and script settings…',
     '请求标识与游戏返回标识不同：':'The requested and returned identifiers differ: ',
+    '兼容性：':'Compatibility: ',
+    '（已比对 {0} 个其他模组）':' (compared with {0} other mods)',
 })

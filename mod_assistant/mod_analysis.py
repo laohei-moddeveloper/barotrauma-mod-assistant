@@ -167,17 +167,21 @@ def _definitions(path: Path, category: str) -> set[tuple[str, str, str]]:
     return _definition_info(path, category)[0]
 
 
-def _definition_info(path: Path, category: str, coverage=None):
+def _definition_info(path: Path, category: str, coverage=None,cancel=None):
     found = set()
     overrides = set()
     from .xml_compare import DefinitionTree
+    def check():
+        if cancel and cancel.is_set():raise Cancelled('分析已停止')
+    check()
     reject_link(path)
     with path.open('rb') as stream:raw=stream.read(8_000_001)
     if len(raw)>8_000_000:raise AssistantError('XML 分析文件超过读取上限')
-    root = ET.fromstring(raw,parser=ET.XMLParser(target=DefinitionTree()))
+    root = ET.fromstring(raw,parser=ET.XMLParser(target=DefinitionTree(check)))
+    check()
     if category=='item':
         from .item_model import item_nodes,attribute
-        for kind,node,mode in item_nodes(root):
+        for kind,node,mode in item_nodes(root,check):
             identifier=attribute(node,'identifier').strip()
             if kind=='item' and (not identifier or not identifier.isascii()):
                 if coverage is not None:coverage['partial']=True
@@ -195,6 +199,7 @@ def _definition_info(path: Path, category: str, coverage=None):
             for group in child:
                 candidates.extend(list(group))
     for element in candidates:
+        check()
         identifier = element.get("identifier", "").strip().casefold()
         tag = element.tag.casefold()
         allowed = PREFAB_TAGS.get(category)
@@ -211,9 +216,10 @@ def _definition_info(path: Path, category: str, coverage=None):
     return found, overrides
 
 
-def _script_inventory(folder: Path, result: Features):
+def _script_inventory(folder: Path, result: Features,cancel=None):
     # Presence is a file fact. Source text cannot prove execution or conflict.
     for path in mod_files(folder):
+        if cancel and cancel.is_set():raise Cancelled('分析已停止')
         suffix=path.suffix.casefold()
         if suffix=='.dll': result.opaque_code+=1
         elif suffix in ('.lua','.cs'):
@@ -221,7 +227,8 @@ def _script_inventory(folder: Path, result: Features):
             if suffix=='.cs': result.csharp_files+=1
 
 
-def inspect(mod: Mod, metadata: dict | None = None) -> Features:
+def inspect(mod: Mod, metadata: dict | None = None,cancel=None) -> Features:
+    if cancel and cancel.is_set():raise Cancelled('分析已停止')
     metadata = metadata or {}
     result = Features(mod.item_id, mod.name,
                       workshop_dependencies=set(metadata.get("children", [])))
@@ -262,6 +269,7 @@ def inspect(mod: Mod, metadata: dict | None = None) -> Features:
             weights["语言/文本"] = -1
         result.kinds = tuple(sorted(kinds, key=lambda x: weights.get(x, 99)))
         for element in root:
+            if cancel and cancel.is_set():raise Cancelled('分析已停止')
             filename = element.get("file", "")
             for dependency in PATH_REF.findall(filename):
                 if dependency.casefold() not in {value.casefold() for value in (mod.item_id,mod.name,*mod.aliases)}:
@@ -278,7 +286,7 @@ def inspect(mod: Mod, metadata: dict | None = None) -> Features:
                     result.partial = True
                     continue
                 coverage={}
-                definitions, overrides = _definition_info(path, tag,coverage)
+                definitions, overrides = _definition_info(path, tag,coverage,cancel)
                 result.partial |= bool(coverage.get('partial'))
                 result.definitions.update(definitions)
                 result.overrides.update(overrides)
@@ -286,19 +294,20 @@ def inspect(mod: Mod, metadata: dict | None = None) -> Features:
                     result.definition_files.setdefault("|".join(key), []).append(path.relative_to(mod.source).as_posix())
             except (OSError, ET.ParseError):
                 result.partial = True
-        _script_inventory(mod.source, result)
+        _script_inventory(mod.source, result,cancel)
         result.declared_rules,result.rule_notes=read_rules(mod.source)
         if result.code_files and "框架/脚本" not in result.kinds and "脚本/工具" not in result.kinds:
             result.kinds = result.kinds + ("脚本/工具",)
         return result
+    except Cancelled:raise
     except (OSError, ET.ParseError, AssistantError):
         result.partial = True
         return result
 
 
-def inspect_all(mods: list[Mod], metadata: dict | None = None) -> dict[str, Features]:
+def inspect_all(mods: list[Mod], metadata: dict | None = None,cancel=None) -> dict[str, Features]:
     metadata = metadata or {}
-    return {mod.item_id: inspect(mod, metadata.get(mod.item_id)) for mod in mods}
+    return {mod.item_id: inspect(mod, metadata.get(mod.item_id),cancel) for mod in mods}
 
 
 def luacs_runtime_detected(env: Environment) -> bool | None:

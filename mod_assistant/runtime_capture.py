@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 
 from .core import AssistantError, reject_link, within
 from .profiles import game_version
+from . import VERSION
 
 SCHEMA='barodock-runtime-v1'
 MAX_BYTES=2*1024*1024
@@ -54,9 +55,10 @@ local function capture()
             end)
             items[#items+1] = itemOk and itemText or ('{"requested":' .. quoted(identifier) .. ',"error":' .. quoted(itemText) .. '}')
         end
+        local captured = os.time()
         local text = '{"schema":"barodock-runtime-v1","capture_id":'
-            .. quoted(tostring(os.time()) .. '-' .. tostring(sequence))
-            .. ',"captured_unix":' .. tostring(os.time())
+            .. quoted(tostring(captured) .. '-' .. tostring(sequence))
+            .. ',"captured_unix":' .. num(captured)
             .. ',"packages":[' .. table.concat(packages, ',') .. ']'
             .. ',"items":[' .. table.concat(items, ',') .. ']}'
         if #text > 2097152 then error("output size limit reached") end
@@ -86,7 +88,7 @@ def create_diagnostic(env, identifiers):
     if folder.exists():raise AssistantError('诊断目录已存在，原文件保留')
     folder.mkdir(parents=True)
     manifest=ET.Element('contentpackage',{'name':'BaroDock Read-only Diagnostics','corepackage':'false',
-                         'gameversion':game_version(env),'modversion':'0.11.0','altnames':''})
+                         'gameversion':game_version(env),'modversion':VERSION,'altnames':''})
     ET.ElementTree(manifest).write(folder/'filelist.xml',encoding='utf-8',xml_declaration=True)
     script_dir=folder/'Lua/Autorun';script_dir.mkdir(parents=True)
     script=LUA.replace('__REQUESTED__','{'+','.join(lua_quote(item) for item in dict.fromkeys(identifiers))+'}')
@@ -103,7 +105,7 @@ def read_runtime_capture(path):
     try:value=json.loads(raw)
     except (ValueError,RecursionError) as error:raise AssistantError('游戏内诊断 JSON 无效') from error
     if not isinstance(value,dict) or value.get('schema')!=SCHEMA:raise AssistantError('游戏内诊断格式无效')
-    if not isinstance(value.get('capture_id'),str) or len(value['capture_id'])>100 or type(value.get('captured_unix')) is not int:raise AssistantError('游戏内诊断时间无效')
+    if not isinstance(value.get('capture_id'),str) or len(value['capture_id'])>100 or type(value.get('captured_unix')) not in (int,float):raise AssistantError('游戏内诊断时间无效')
     if not value['capture_id'] or not 0<=value['captured_unix']<=253402300799:raise AssistantError('游戏内诊断时间无效')
     for key,maximum in [('packages',1000),('items',100)]:
         if not isinstance(value.get(key),list) or len(value[key])>maximum:raise AssistantError('游戏内诊断数量无效')
@@ -142,7 +144,7 @@ def compare_runtime(env,capture,model=None):
         item=identify(row['manifest'])
         if item:observed.append(item)
         else:unmapped.append(row['name'])
-    profile=capture_profile(env,mods=mods)
+    profile=capture_profile(env,mods=mods,include_receipts=False)
     configured=[profile['core']['id'] if profile.get('core') else 'vanilla',*[row['id'] for row in profile['order']]]
     items=[]
     for row in capture['items']:

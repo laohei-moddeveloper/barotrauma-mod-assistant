@@ -62,8 +62,15 @@ class LocalizedVar(tk.StringVar):
         owner.variables.append(weakref.ref(self))
 
     def set(self, value):
+        self.literal=False
         self.raw = self.owner.source(str(value))
         self.rendered = self.owner.text(self.raw)
+        super().set(self.rendered)
+
+    def set_literal(self,value):
+        """Set already formatted display text; caller rerenders language labels."""
+        self.literal=True
+        self.raw=self.rendered=str(value)
         super().set(self.rendered)
 
     def get(self):
@@ -71,6 +78,7 @@ class LocalizedVar(tk.StringVar):
         return self.raw if current == self.rendered else self.owner.source(current)
 
     def refresh(self):
+        if getattr(self,'literal',False):return
         self.raw = self.get()
         self.rendered = self.owner.text(self.raw)
         super().set(self.rendered)

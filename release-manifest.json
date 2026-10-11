@@ -1,22 +1,21 @@
 {
-  "version": "0.10.0",
+  "version": "1.0.0",
   "platform": "Windows x64",
   "languages": [
     "zh",
     "en"
   ],
   "release_state": "release",
-  "prepared_at_utc": "2026-10-06T02:52:08.790324+00:00",
-  "unit_tests_passed": 234,
+  "prepared_at_utc": "2026-10-11T13:25:22.436184+00:00",
+  "unit_tests_passed": 292,
   "packaged_self_check": true,
   "historical_binary_rebuilt": false,
   "validation": {
-    "readonly_local_mods": 53,
     "configuration_unchanged": true,
     "fresh_assistant_settings": true,
     "packaged_evidence_workflows": {
       "ok": true,
-      "version": "0.10.0",
+      "version": "1.0.0",
       "fixture_only": true,
       "Steam_connected": false,
       "game_launched": false,
@@ -24,6 +23,8 @@
       "native_save_association_checked": true,
       "XML_field_and_registration_check": true,
       "logged_error_file_link_checked": true,
+      "investigation_repair_and_append_recheck": true,
+      "optional_observer_export_import": true,
       "configuration_unchanged": true,
       "languages": [
         "en",
@@ -34,65 +35,109 @@
     "bilingual_ui_checked": true,
     "no_runtime_dependency_added": true,
     "clean_windows_ci": {
-      "run": true,
-      "passed": true,
-      "url": "https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/actions/runs/37405659238",
-      "source_commit": "ca17b982a5756532afe7eb0e67203959192ff920",
-      "unit_tests_passed": 234
+      "run": false,
+      "reason": "awaiting source push"
+    },
+    "optional_observer_real_round": {
+      "capture_parsed": true,
+      "configured_packages": 27,
+      "observed_packages": 27,
+      "order_matches": true,
+      "unmapped_packages": [],
+      "items": [
+        {
+          "identifier": "barodock_probe",
+          "observed_missing": true,
+          "observed_provider": null,
+          "observed_fields": {
+            "health": null,
+            "maxstacksize": null
+          }
+        },
+        {
+          "identifier": "barodock_variant",
+          "observed_missing": true,
+          "observed_provider": null,
+          "observed_fields": {
+            "health": null,
+            "maxstacksize": null
+          }
+        },
+        {
+          "identifier": "wrench",
+          "observed_missing": false,
+          "observed_provider": "vanilla",
+          "observed_fields": {
+            "health": 100,
+            "maxstacksize": 1
+          }
+        }
+      ],
+      "actual_game_round": true,
+      "native_source_submarine_unchanged": true,
+      "campaign_mode_used": false,
+      "original_configuration_restored": true,
+      "test_folders_archived": true
     },
     "gameplay_verified": false,
     "fresh_windows_steam_installation_tested": false,
     "CSharp_semantic_analysis": false,
     "malware_detection": false,
-    "actual_cross_volume_restore_and_rollback": true,
     "isolated_bilingual_installer": true
   },
   "executable": {
     "name": "BarotraumaModAssistant.exe",
-    "bytes": 13618248,
-    "sha256": "6fa8f63ec8579e2ed4a77bb2c4cae6c730848bb2c3d0b1f8a1708c4e122afe0d"
+    "bytes": 13718619,
+    "sha256": "c37d54fd186e0565ee497f28457be37ef37ab7c3d54a69a2a4fac6784477852e"
   },
   "archive": {
-    "name": "BarotraumaModAssistant-v0.10.0-win64.zip",
-    "bytes": 13363863,
-    "sha256": "a994c6315a10ecba9e3529c48edf5d10887dd5ddf98bd5f8023641a7f6acc7a1"
+    "name": "BarotraumaModAssistant-v1.0.0-win64.zip",
+    "bytes": 13479728,
+    "sha256": "8e42a692a2ef2f838c3a58e610b232a4ab73c58cc7a8623f447a81e2e2893b28"
   },
   "sources": {
-    "mod_assistant/__init__.py": "05829ca4f16ec46bc262350b71e580287c858e08d586aec9c45d515f3bf12a7f",
+    "mod_assistant/__init__.py": "28fa0610821d836bba679a3e34270a879e98518d5f3ff09266b3fde89a810c5f",
     "mod_assistant/access.py": "632c11aab7925dc9e9cd4a8c53f3a46d2689e432ea6cbbd61c8971b9fcca1708",
-    "mod_assistant/analysis_cache.py": "519c3e0cc7bf2e6e89a3dd1f503ebdbfddadf63b45db4bdae79f1e9e64e437dc",
-    "mod_assistant/app.py": "ca02e8d6d85251eb06d92c883f92e51095735b4b9f595e6c13c2fed2e9f98a4d",
-    "mod_assistant/appearance.py": "aeccc7ee8e7f1f8a55433d5809efb0dc7ea5e720985b383a3ce2c2b3e3a4b2d4",
-    "mod_assistant/author_rules.py": "bee342a21473fd1eefbc3cbedb7636913997c88032ac387703364bfdfec053fc",
-    "mod_assistant/core.py": "26e33408cb370c191aee1283ba282e79081c35f0ebd7ca40f85abd6a3fa59bbf",
-    "mod_assistant/diagnostics.py": "879fa94ed586a792e128d2ae9b96d6be5c3fcc08d84491e23fd99372fb18faa4",
+    "mod_assistant/analysis_cache.py": "1cc4675bd4377ea7ec82c8e71c1bca410bf54c414d0422c2f98ba6dc82b73a56",
+    "mod_assistant/app.py": "530aa7a7fd4f507b897852ae8bf224e122f944608df11cc4a42a18374aaff41d",
+    "mod_assistant/appearance.py": "df81351ea4ac1a993264b6ef22719b81fd59409cefeaa22afbac8e3c53ef52e7",
+    "mod_assistant/author_rules.py": "1bbcabef23273aff20f8ed967e6451e58898fe0a2bdaa290bf9334a4d44bca1c",
+    "mod_assistant/core.py": "74dbae1c625b64601ed5e0f0e47a826e49298bf9e1b5dfdcbcb9315b640fcd3a",
+    "mod_assistant/diagnostics.py": "18ad9f6d3d5724e15e228f36801fb71d807f648ca2c990bde4da63d8450f2507",
     "mod_assistant/drafts.py": "1486dbf4df4f05e852ac56d9192c4b9a082e3f9f2ec3d205079a168c0ca3b6c6",
     "mod_assistant/engine.py": "276ff660c2b2f73f88e6fc9023ecba19a6e02b575fecdcf9084e61ab27da3857",
-    "mod_assistant/evidence_check.py": "ed7ca09f873e5780500f054335d44da61c79f354c7819776a6e5865b18289c19",
+    "mod_assistant/evidence_check.py": "c33ccbfe1d12cdcdb87b553579c4b347574d5104ae826af195ba883b8c500c95",
+    "mod_assistant/file_evidence.py": "28d9fcdf07691ef4a8743ace38a23a97135a38565e334461e1210fb97de9d8ce",
     "mod_assistant/friends.py": "ae06a1ef354b7ba23fdcfa4a31185990941043496e239d5d378e6f6b0c5606d6",
     "mod_assistant/game_config.py": "4fcad6fca78caea1232f5eca1a14f53d76d1736d17f23da213a932793082ce2a",
-    "mod_assistant/i18n.py": "d5d1394bf579261c5d88f243fd98d7ae772114fdf58a4096a12b66987a457096",
-    "mod_assistant/i18n_catalog.py": "435b3b6fa6914ba5bec6cff3fba581abd68fb97a1b6fd21e9b04e41928f128b2",
-    "mod_assistant/luacs.py": "bb0398d89666bfb5f54c0a5babc20f4709f83125ae771267d956160d43b7a34b",
-    "mod_assistant/main_ui.py": "0412ab7787b35901bbe36047f3d76cf1e9065499cbea78da0f88aaead529fc0d",
+    "mod_assistant/i18n.py": "240e933990bf3a7425e50be4f66dceaa8aa725cc4a66b71482dadb8f45bc5ae9",
+    "mod_assistant/i18n_catalog.py": "4af51fe56b91b6df1af6afb09e59e2b455a3ccf43485b005bb3c5d9ffdff3fdd",
+    "mod_assistant/investigation.py": "b59951ff9080cebabfd83513d048d02af4a75f6ab49a10106bb31ee1eff94fe7",
+    "mod_assistant/investigation_ui.py": "377dd86d8e2ec54531b0db44d5312152b19cfbb25e4255d8b9a6607d5086d103",
+    "mod_assistant/item_model.py": "7f811a555bc1ab0045ac3c8abde9977f5272835671474b9e3375b2ba7de2a214",
+    "mod_assistant/luacs.py": "cdb71e4f6b80920a8286577ed9a92e7f5f8a7a996d76bc1adede23d853fcf15b",
+    "mod_assistant/main_ui.py": "c9992895af087a36cdb7f31ef8c85831e0e000755fd593ceb6d5a77dc64624e6",
     "mod_assistant/management_ui.py": "f4fb6ba84487c7fafa411a12cffe156653a0e78167816c65dec16375f62e1f08",
-    "mod_assistant/mod_analysis.py": "9194528b2c825bfb9ec8bb92b979d1018af8b7fcb6d6622d21e23c860eaddbfd",
-    "mod_assistant/mod_order.py": "33c3108da09cefe87b0b867e6613ae998def2b73b00c429a1961aeb42ebd96b2",
+    "mod_assistant/mod_analysis.py": "1e44aa6885d265a038fd7dc6a3a779de7c99167c5d0be0ba7242af42f83cf5b8",
+    "mod_assistant/mod_order.py": "63f67fa609bca7c57cc38b1cfee65f7c2c195cbc4767c880aa30307c37d242ab",
     "mod_assistant/mod_toggle.py": "ce16cca5fb7526229cfcaa9c7fc00f67432c7a4b380c929daaac67fe5b1d5891",
     "mod_assistant/native_profiles.py": "94db4418684106b9be6cde844c8b93c04f55588ffbe89bbc4ab00b8392199eef",
     "mod_assistant/operation_errors.py": "abbc4ffaeb5d3a6ddaf20ca56b323a2a1e382276ee9efd2b6f5d755a3bf9a7d4",
-    "mod_assistant/order_ui.py": "d9ee7fc3ddd81f43ee817bf4281bcb9d6aa9a375683601472772bd5d6597ac15",
-    "mod_assistant/preferences.py": "4d6232233ada8dec791cd3736ca68f16a7374269c2775c678901a5ed41fc5558",
-    "mod_assistant/profiles.py": "55019deb101e84368ebdd2a7e68cefb6cd5d49394706758c949a1ada3b49848f",
-    "mod_assistant/rule_evidence.py": "86e6e7ef221eed621d3159ae33a3fbd625a6f81b0fb9a8ec3ce9a3adbd1b6603",
+    "mod_assistant/order_ui.py": "f82e8ff749ec64cbcb7eea437fff2f086ab5a2938fbec27cc661640c661770ed",
+    "mod_assistant/patch_draft.py": "f436221d165c1bcaf0bdf6bcbb56c57cadb094a42f05f6266b9635310c4b5fda",
+    "mod_assistant/preferences.py": "712678dee6ae5876c12a14e2ca435f218ac8cfe26636ecec864d42ab1d31dc4e",
+    "mod_assistant/profiles.py": "ad62c74cc7b4620933f1e3d639d0f6933f25ee02dcf6a930fef5c9e9e5f5325c",
+    "mod_assistant/resource_evidence.py": "e46e788598a9736999fc056029fea2f8a33248cafcde50bb9453e0938b4f4b90",
+    "mod_assistant/rule_evidence.py": "01dab381d70de6c5ba03b617feb16468e50ddcd7dadf37c015474211d7457690",
+    "mod_assistant/runtime_capture.py": "5255dd9150e0e73bf299ef796c7362b5a89cc1f41481383b5aa208e18bbe4f54",
     "mod_assistant/runtime_evidence.py": "cc0ce6381e50c31e2b9cdbf5d4501858d7130e6c35dc6a73bc124180f3bf8392",
     "mod_assistant/save_inspector.py": "f655e4d07d72b8a20889ea77f25c7c3182bab1f4c11682aac7a510119809f0db",
     "mod_assistant/save_ui.py": "4874259726b9f9609e247f9200806716dbc5f132f0d9a9e09419c0eef56f7f20",
     "mod_assistant/snapshots.py": "54f20591175d909ff8b35f8b1e8340722252e416ef872961d65d14fbe514b278",
     "mod_assistant/steam.py": "f1552ac1d638df396b236ef43e56dc15badd289acdb2758cdd1ea9c30e4fdaca",
     "mod_assistant/tasks.py": "2061d93afa778590f1ea9351ee5b2f189f164a99403b189f1daf511d2604c718",
-    "mod_assistant/xml_compare.py": "180c81bb0f5313cb7e757ffd0f3341911a5b732962c2145cd46ee7a497497465",
-    "mod_assistant/xml_compare_ui.py": "1cc5aeb13760462397749467a48d78aa253fc5ff3913430d78daefd206fe8be2",
-    "mod_assistant/xml_semantics.py": "d7ee4ed1347e1317a2b6fb8ebaffe722386a2fe196b8820b7b664ad28f6ba9bf"
+    "mod_assistant/xml_compare.py": "0cd71d1155f67a658df760dc294e81eb5ad0fb1530a01b9dd3d535eb5ecf047a",
+    "mod_assistant/xml_compare_ui.py": "7fe88a123bba97dd584b0580118f2c281dbbe8ad8a67ca2960e95f4f8561b4e1",
+    "mod_assistant/xml_semantics.py": "38fb3dc6b4b56115c962eca22f64a074d6dc7a112b1ad17f6b56bb0a1cf76103"
   }
 }

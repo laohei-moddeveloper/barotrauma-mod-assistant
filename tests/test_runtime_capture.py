@@ -7,6 +7,12 @@ from mod_assistant.runtime_capture import create_diagnostic,read_runtime_capture
 
 
 class RuntimeCaptureTests(Fixture):
+    def test_fractional_moonsharp_timestamp_is_preserved_but_invalid_numbers_rejected(self):
+        path=self.env.player/'runtime.json';record=self.capture();record['captured_unix']=1791721808.3550065
+        path.write_text(json.dumps(record));self.assertEqual(read_runtime_capture(path)['captured_unix'],record['captured_unix'])
+        for value in (True,float('nan'),float('inf'),-1):
+            record['captured_unix']=value;path.write_text(json.dumps(record))
+            with self.assertRaises(AssistantError):read_runtime_capture(path)
     def capture(self):
         return {'schema':'barodock-runtime-v1','capture_id':'example-1','captured_unix':1791700000,
             'packages':[{'name':'Vanilla','version':'1','index':0,'manifest':'Content/ContentPackages/Vanilla.xml'},
@@ -40,6 +46,13 @@ class RuntimeCaptureTests(Fixture):
             return original(path,*args,**kwargs)
         with patch.object(Path,'resolve',resolve):result=compare_runtime(self.env,record)
         self.assertEqual(result['unmapped_packages'],['Mod 101'])
+
+    def test_observation_comparison_does_not_walk_installed_asset_receipts(self):
+        folder=self.env.work/'receipts';folder.mkdir(parents=True)
+        for item in ('101','102'):(folder/(item+'.json')).write_text('{"installed_snapshot":{},"fingerprint":"fixture"}')
+        with patch('mod_assistant.profiles.files_snapshot',side_effect=AssertionError('Observation comparison walked asset files')):
+            result=compare_runtime(self.env,self.capture())
+        self.assertEqual(result['observed'],['vanilla','101'])
 
     def test_invalid_numeric_or_duplicate_index_records_are_rejected(self):
         path=self.env.player/'runtime.json'

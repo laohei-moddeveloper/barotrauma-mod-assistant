@@ -1,48 +1,43 @@
 [b]Source & downloads:[/b] [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant]Public GitHub repository[/url] · [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/latest]Latest release[/url]
 
-[h1]Spend less time organizing mods[/h1]
-BaroDock is a free, standalone Windows 64-bit Barotrauma mod manager: load-order previews and dragging, updates, game presets, backups and XML override comparisons. No Python installation needed. Switch between English and Chinese in the app.
+[h1]Review the order. Investigate the evidence.[/h1]
+BaroDock 1.0 is a free standalone Windows 64-bit Barotrauma mod manager. Organize load order, update mods, keep presets and investigate specific XML or log issues. Switch between English and Chinese. Python is not required.
 [b]This Workshop item delivers an external tool. Install it to your desktop; do not enable it as a gameplay mod or require it on your server.[/b]
 
-[h1]0.10.0: order evidence, campaign matching and specific troubleshooting[/h1]
+[h1]What it helps with[/h1]
 [list]
-[*][b]Traceable ordering:[/b] record a rule's reason, source, date and version scope. Stale rules are suspended. Review changes before applying; directory references no longer imply loading priority.
-[*][b]Continue a campaign:[/b] Import list accepts .save files. Review missing or ambiguous names and recorded order, then create a native ModLists preset. Saves and the enabled list remain unchanged; no automatic subscriptions.
-[*][b]Specific XML and log evidence:[/b] inspect fields, Vanilla values, identifiers and files. The Item registration model covers reviewed 1.13.4.0 conditions; Clear, inheritance, other types and scripts are not guessed. Explicit logged errors can link to current XML with repair and reproduction steps.
-[*][b]Clear states and recovery:[/b] C# allow/disable/prompt/unreadable policies are separate from session execution. Keep visible backups, actionable errors, dragging/undo, six management actions and both languages.
+[*][b]Auto-sort and dragging:[/b] use author declarations, explicit rules and locks. Review proposed changes and reasons before applying. Undo is available; names such as “Patch” do not invent mandatory order rules.
+[*][b]Specific diagnostics:[/b] compare XML identifiers, fields and source files. Reviewed Item checks explain inheritance, Clear, registration problems and lost changes. Logs keep early failures and group complete exception blocks.
+[*][b]Recheck after updates:[/b] record rule sources, versions and actual file hashes. Changed bytes can suspend old evidence even when the declared version stays the same.
+[*][b]Repair and recheck:[/b] save inputs and reproduction steps, create native repair presets or explicit field drafts, then check a new test log. An optional read-only Lua observer compares loaded packages and selected Item fields.
+[*][b]Lists and recovery:[/b] native ModLists, read-only campaign matching, snapshots, scoped restores, reverse dependency queries and local labels. Presets, saves, snapshots and LuaCs backups have separate purposes.
+[*][b]Updates and scripting tools:[/b] concurrent requests/install scheduling and failed-item retry. Official LuaCs client installation/update is separate from C# permission; updating does not enable C# by default.
 [/list]
-[url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/tag/v0.10.0]Release notes[/url] · [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/docs/evidence-workflows.md]Workflows and supported cases[/url]
+[url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/releases/tag/v1.0.0]1.0 release notes[/url] · [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/docs/investigation-workflows.md]Workflows and limits[/url]
 
 [h1]Install and get started[/h1]
 [olist]
-[*]Subscribe and wait for Steam to download. If the installed folder has not been created, open Barotrauma to its main menu, then exit.
+[*]Subscribe and wait for Steam to download. If the installed folder is missing, open Barotrauma to the main menu, then exit.
 [*]Press Win+R and open:
 [code]%LOCALAPPDATA%\Daedalic Entertainment GmbH\Barotrauma\WorkshopMods\Installed\__WORKSHOP_ID__[/code]
-[*]Run Install-to-desktop.cmd, or copy BarotraumaModAssistant.exe into your own folder and run it.
+[*]Run Install-to-desktop.cmd, or copy BarotraumaModAssistant.exe to your own folder and run it.
 [/olist]
-If that folder is missing, browse the game's local files in Steam, return to steamapps and check the download library:
-[code]workshop\content\602960\__WORKSHOP_ID__[/code]
+Alternatively check the Steam library containing the game:
+[code]steamapps\workshop\content\602960\__WORKSHOP_ID__[/code]
 The desktop copy is in [code]%LOCALAPPDATA%\BarotraumaModAssistant\WorkshopProgram[/code]
-[b]After a Workshop update, close the old app and rerun the installer or replace your desktop copy.[/b] Steam does not update that separate copy. Unsubscribing does not remove it or your settings.
+[b]After a Workshop update, close the old app and rerun the installer or replace the desktop copy.[/b] Steam does not update that separate copy. Your preferences are retained.
 
 [h1]Everyday use[/h1]
-[olist]
-[*]Close the game and dedicated server before changes. Local inspection is the default. Choose Online inspection or an update explicitly, with Steam signed in.
-[*]Update selects items for a task; Enabled controls what the game loads. These are separate. Start the update or review an Auto-sort preview, then apply it explicitly.
-[*]Save/import game presets and review missing entries/differences. Subscribe manually in Steam before Download and apply. Install local mods separately.
-[*]Save a tested setup as a snapshot; review restore scope before restoring. LuaCs client backups are separate from mod snapshots.
-[*]Tools contains LuaCs, detailed analysis, logs, recent error details and reports. Settings offers themes, font size, density and concurrency choices.
-[/olist]
+Close the game and dedicated server before file or list changes. Update selection and Enabled state are separate. Start with Auto-sort preview, then review changes. Select a mod and open Full analysis → XML override comparison for specific definitions. Log diagnosis contains scene records, repair drafts and rechecks. Subscribe to missing Workshop items manually in Steam; install local packages separately.
 
-[h1]Purpose and limits[/h1]
-Steam controls actual download scheduling; parallel requests cannot guarantee bypassing queues, server limits or bandwidth. Accepted downloads may continue after stopping. XML and dependency findings do not prove gameplay compatibility or detect malware. Follow authors' instructions and test in game. Impact describes scope, not quality. Native XML presets do not store versions/hashes or fetch historical versions; legacy JSON and the JSON friend-list export retain recorded information. Snapshots consume space and restore saved files only, not subscriptions, Steam cache or LuaCs.
+[h1]Clear limits[/h1]
+Steam controls download queues and bandwidth; this app cannot promise to bypass them. File evidence and models do not certify all scripts, constructors, mod safety or universal compatibility. Unsupported content types do not inherit Item conclusions. Drafts need review and a separate test session; historical mod versions cannot be reconstructed from data a save never recorded.
 
-[b]Access:[/b] the selected game folder, this user's game files, Steam game manifests and app data. Online operations use the official interface for Barotrauma subscription/download status and public item metadata. Steam may show the game as running. No process enumeration, process-memory inspection, automatic subscription changes, wallet/credential/firewall checks, telemetry or administrator elevation.
-LuaCs C# mods are not sandboxed; use trusted mods. This desktop app is not an OS sandbox either. Review personal information before sharing logs. [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/ACCESS_AND_PRIVACY.md]Access details[/url]
+The 1.0 optional observer passed a real LuaCs client test round on this machine: package order and queried Item data imported correctly, and fractional timestamp handling was fixed. Other computers and complete multiplayer combinations still need testing. See [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/docs/validation.md]verification scope[/url].
 
-[h1]Suggestions and criticism are welcome[/h1]
-Thank you to players who test, write detailed reports and provide screenshots. How the tool works in your actual setup matters more than the number of features. Awkward workflows, unclear messages, sorting problems and restore failures are welcome in the comments or [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/issues]GitHub Issues[/url]. Include your version, steps and exact error; never send passwords or verification codes. I will check reports carefully and document confirmed fixes, although I cannot promise to resolve every issue immediately.
+[b]Access:[/b] selected game files, the current user's game data, Steam game manifests and assistant data. Online and write actions are explicit. No process enumeration/memory reads, automatic subscriptions, wallet/credential/firewall inspection, telemetry or elevation request. C# mods and normal desktop apps are not OS sandboxes. Review personal information in logs and reproduction notes before sharing. [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/blob/main/ACCESS_AND_PRIVACY.md]Access details[/url]
 
-Current version: [b]0.10.0[/b]. 234 unit/isolated checks, real C/D restoration and failure rollback, and packaged bilingual checks do not cover every computer, mod combination or multiplayer session. Includes guides, access details and SHA-256 checksums. No base-game files, third-party mods or personal configurations are distributed.
+[h1]Feedback is welcome[/h1]
+Thank you for testing, writing detailed reports and sharing screenshots. Practical usability matters more than feature counts. If an action is hard to find, a warning is unclear, or sorting/recovery does not help, please tell me in comments or [url=https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/issues]GitHub Issues[/url]. Include the version, steps and exact error; avoid passwords, codes or unreviewed full logs. I will investigate, document corrections and keep learning from your suggestions.
 
-[b]AI assistance:[/b] AI was used during development. The current cover is an original geometric design drawn in code; earlier artwork used AI assistance.
+[b]AI assistance:[/b] AI assisted development and some production. The current geometric cover is drawn in code; earlier cover art used AI assistance.

@@ -6,10 +6,11 @@ from .core import AssistantError, reject_link, within
 
 class DefinitionTree(ET.TreeBuilder):
     def doctype(self,*args): raise AssistantError('XML 对照不读取文档类型或外部实体')
-    def __init__(self):
-        super().__init__(); self.depth=0; self.nodes=0
+    def __init__(self,check=lambda:None):
+        super().__init__(); self.depth=0; self.nodes=0;self.check=check
     def start(self,tag,attrs):
         self.depth+=1; self.nodes+=1
+        if self.nodes%64==1:self.check()
         if self.depth>128 or self.nodes>100000: raise AssistantError('XML 定义结构超过读取上限')
         return super().start(tag,attrs)
     def end(self,tag):
