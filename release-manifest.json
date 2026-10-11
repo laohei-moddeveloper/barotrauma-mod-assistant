@@ -6,8 +6,8 @@
     "en"
   ],
   "release_state": "release",
-  "prepared_at_utc": "2026-10-11T13:25:22.436184+00:00",
-  "unit_tests_passed": 292,
+  "prepared_at_utc": "2026-10-11T15:28:34.336729+00:00",
+  "unit_tests_passed": 293,
   "packaged_self_check": true,
   "historical_binary_rebuilt": false,
   "validation": {
@@ -35,8 +35,11 @@
     "bilingual_ui_checked": true,
     "no_runtime_dependency_added": true,
     "clean_windows_ci": {
-      "run": false,
-      "reason": "awaiting source push"
+      "run": true,
+      "passed": true,
+      "url": "https://github.com/laohei-moddeveloper/barotrauma-mod-assistant/actions/runs/38151341963",
+      "source_commit": "0615ca707613e96e7ebabf113ea15626bfbede72",
+      "unit_tests_passed": 293
     },
     "optional_observer_real_round": {
       "capture_parsed": true,
@@ -83,17 +86,19 @@
     "fresh_windows_steam_installation_tested": false,
     "CSharp_semantic_analysis": false,
     "malware_detection": false,
-    "isolated_bilingual_installer": true
+    "isolated_bilingual_installer": true,
+    "workshop_final_sync": false,
+    "workshop_note": "Owner paused Workshop work after Steam rejected final file sync. GitHub contains the final Windows-path-alias fix."
   },
   "executable": {
     "name": "BarotraumaModAssistant.exe",
-    "bytes": 13718619,
-    "sha256": "c37d54fd186e0565ee497f28457be37ef37ab7c3d54a69a2a4fac6784477852e"
+    "bytes": 13719289,
+    "sha256": "512b0050aba868b55849c9ee6c75eb1fc3d92bc9237341f3862560910abcb8eb"
   },
   "archive": {
     "name": "BarotraumaModAssistant-v1.0.0-win64.zip",
-    "bytes": 13479728,
-    "sha256": "8e42a692a2ef2f838c3a58e610b232a4ab73c58cc7a8623f447a81e2e2893b28"
+    "bytes": 13480486,
+    "sha256": "aebfce9107474d911f5a3a0efda3e94c597fe592ecf9e89990e44648b15276bf"
   },
   "sources": {
     "mod_assistant/__init__.py": "28fa0610821d836bba679a3e34270a879e98518d5f3ff09266b3fde89a810c5f",
@@ -129,7 +134,7 @@
     "mod_assistant/profiles.py": "ad62c74cc7b4620933f1e3d639d0f6933f25ee02dcf6a930fef5c9e9e5f5325c",
     "mod_assistant/resource_evidence.py": "e46e788598a9736999fc056029fea2f8a33248cafcde50bb9453e0938b4f4b90",
     "mod_assistant/rule_evidence.py": "01dab381d70de6c5ba03b617feb16468e50ddcd7dadf37c015474211d7457690",
-    "mod_assistant/runtime_capture.py": "5255dd9150e0e73bf299ef796c7362b5a89cc1f41481383b5aa208e18bbe4f54",
+    "mod_assistant/runtime_capture.py": "cd99b024efa8853edd9462b3f1433fdc6016901292ec1e7f35e52b85a18464be",
     "mod_assistant/runtime_evidence.py": "cc0ce6381e50c31e2b9cdbf5d4501858d7130e6c35dc6a73bc124180f3bf8392",
     "mod_assistant/save_inspector.py": "f655e4d07d72b8a20889ea77f25c7c3182bab1f4c11682aac7a510119809f0db",
     "mod_assistant/save_ui.py": "4874259726b9f9609e247f9200806716dbc5f132f0d9a9e09419c0eef56f7f20",

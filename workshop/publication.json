@@ -2,12 +2,12 @@
   "app_id": 602960,
   "id": "3812360206",
   "url": "https://steamcommunity.com/sharedfiles/filedetails/?id=3812360206",
-  "title": "BaroDock｜潜渊症模组管理",
-  "version": "0.10.0",
+  "title": "BaroDock｜自动排序·排错助手",
+  "version": "1.0.0",
   "visibility": "public",
   "upload_confirmed": true,
   "legal_acceptance_required": false,
-  "title_en": "BaroDock | Barotrauma Mod Manager",
+  "title_en": "BaroDock | Auto-Sort & Diagnostics",
   "languages": [
     "schinese",
     "english"
@@ -16,7 +16,7 @@
     "zh",
     "en"
   ],
-  "executable_sha256": "6fa8f63ec8579e2ed4a77bb2c4cae6c730848bb2c3d0b1f8a1708c4e122afe0d",
+  "executable_sha256": "c37d54fd186e0565ee497f28457be37ef37ab7c3d54a69a2a4fac6784477852e",
   "cover": {
     "file": "cover-en.gif",
     "language": "english",
@@ -31,5 +31,7 @@
     "sha256": "1d2bd7acdad29644185ea2eee86feadfe1b87a544c7bdb4d2b7adeb4c444feee",
     "steam_preview_url": "https://images.steamusercontent.com/ugc/18144334443291528270/1D12616F8E91328CAD4AE86227E8E4C04C3280CF/",
     "animated_upload_verified": true
-  }
+  },
+  "public_access_verified": false,
+  "final_program_sync": "pending: Steam returned Access Denied; public page reports hidden or insufficient permission; owner stopped further Workshop actions"
 }
