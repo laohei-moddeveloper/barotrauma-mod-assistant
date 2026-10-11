@@ -54,6 +54,15 @@ class RuntimeCaptureTests(Fixture):
             result=compare_runtime(self.env,self.capture())
         self.assertEqual(result['observed'],['vanilla','101'])
 
+    def test_known_path_aliases_match_without_resolving_imported_labels(self):
+        original=Path.resolve
+        def expanded(path,*args,**kwargs):
+            result=original(path,*args,**kwargs)
+            return result.parent/'expanded-alias'/result.name
+        with patch.object(Path,'resolve',expanded):
+            result=compare_runtime(self.env,self.capture())
+        self.assertEqual(result['observed'],['vanilla','101'])
+
     def test_invalid_numeric_or_duplicate_index_records_are_rejected(self):
         path=self.env.player/'runtime.json'
         for change in (lambda value:value['packages'][1].update(index=0),lambda value:value['items'][0].update(health=float('nan')),

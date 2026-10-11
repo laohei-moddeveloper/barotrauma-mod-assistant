@@ -27,7 +27,7 @@ class ItemModelTests(Fixture):
         self.assertEqual(result['status'],'limited');self.assertFalse(result['winner'])
         self.assertNotIn('ss',registry['failures'])
         self.assertEqual({row['reason'] for row in result['unsupported']},{'unicode_identifier','legacy_identifier'})
-        mod=self.make('101');(mod.source/'items.xml').write_text('<Items><Item identifier="ss"/><Item identifier="ß"/></Items>')
+        mod=self.make('101');(mod.source/'items.xml').write_text('<Items><Item identifier="ss"/><Item identifier="ß"/></Items>',encoding='utf-8')
         feature=inspect(mod);self.assertTrue(feature.partial);self.assertEqual(feature.definitions,{('item','item','ss')})
     def test_clear_hides_selected_early_override_without_falling_back(self):
         registry=build_registry([package('vanilla',-1,'<Items><Item identifier="a"/></Items>'),

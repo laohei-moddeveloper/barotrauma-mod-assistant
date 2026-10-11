@@ -132,8 +132,16 @@ def compare_runtime(env,capture,model=None):
     from .profiles import capture_profile,installed_path
     from .core import inventory
     mods=inventory(env);known={mod.item_id:mod for mod in mods}
-    paths={str((installed_path(env,mod)/'filelist.xml').resolve()).casefold():mod.item_id for mod in mods if installed_path(env,mod) is not None}
-    paths[str((env.game/'Content/ContentPackages/Vanilla.xml').resolve()).casefold()]='vanilla'
+    paths={}
+    def remember(path,item):
+        # Known paths may use Windows short-name aliases. Preserve their lexical
+        # label as well as the resolved spelling; imported labels remain unopened.
+        for spelling in (path,path.resolve()):
+            paths[os.path.normcase(os.path.normpath(str(spelling)))]=item
+    for mod in mods:
+        folder=installed_path(env,mod)
+        if folder is not None:remember(folder/'filelist.xml',mod.item_id)
+    remember(env.game/'Content/ContentPackages/Vanilla.xml','vanilla')
     def identify(value):
         # Imported paths are labels for matching only. No imported location is opened.
         path=Path(value.replace('\\','/'))
