@@ -5,6 +5,14 @@ from mod_assistant.xml_semantics import field_changes,compare_semantics
 
 
 class SemanticTests(Fixture):
+    def test_custom_item_root_text_comparison_does_not_pick_component_identifier(self):
+        from mod_assistant.xml_compare import definition_text
+        mod=self.make('101')
+        (mod.source/'items.xml').write_text('<Items><CustomItem identifier="shared"><Component identifier="shared" /></CustomItem></Items>')
+        text=definition_text(mod.source,inspect(mod),('item','item','shared'))
+        self.assertEqual(text.count('<CustomItem'),1)
+        self.assertEqual(text.count('<Component'),1)
+
     def setup_mods(self):
         left=self.make('101'); right=self.make('102')
         (left.source/'items.xml').write_text('<Items><Override><Item identifier="shared" price="5"><Attack damage="10" /></Item></Override></Items>')
@@ -32,11 +40,23 @@ class SemanticTests(Fixture):
         for mod in (left,right): (mod.source/'items.xml').write_text('<Items><Item identifier="shared"/></Items>')
         self.assertEqual(self.result(left,right)['loading']['status'],'duplicate')
 
-    def test_clear_in_package_without_matching_identifier_blocks_incomplete_model(self):
+    def test_custom_core_is_the_field_baseline_and_not_vanilla(self):
+        left,right=self.setup_mods();core=self.make('103',core=True)
+        (core.source/'items.xml').write_text('<Item identifier="shared" price="8"><Attack damage="10"/></Item>')
+        a,b,c=inspect(left),inspect(right),inspect(core)
+        self.configure(['101','102'],core='103')
+        result=compare_semantics(self.env,left.source,a,right.source,b,('item','item','shared'),
+            [('101',left.source,a),('102',right.source,b),('103',core.source,c)],['101','102'])
+        self.assertEqual(result['baseline_name'],'Mod 103')
+        change=next(row for row in result['changes'] if row['path']=='/item/@price')
+        self.assertEqual(change['baseline'],'8');self.assertEqual(change['kind'],'仅左方改变该字段')
+        self.assertEqual(result['loading']['winner'],'101')
+
+    def test_clear_in_package_without_matching_identifier_is_resolved(self):
         left,right=self.setup_mods(); other=self.make('104')
         (other.source/'items.xml').write_text('<Items><Clear /></Items>'); feature=inspect(other)
         result=self.result(left,right,[(other.item_id,other.source,feature)])
-        self.assertEqual(result['loading']['status'],'limited'); self.assertFalse(result['loading']['winner'])
+        self.assertEqual(result['loading']['status'],'cleared'); self.assertFalse(result['loading']['winner'])
 
     def test_other_version_or_inheritance_does_not_invent_winner(self):
         left,right=self.setup_mods(); path=self.env.game/'Content/ContentPackages/Vanilla.xml'
@@ -44,7 +64,7 @@ class SemanticTests(Fixture):
         self.assertEqual(self.result(left,right)['loading']['status'],'limited')
         path.write_text(path.read_text().replace('9.0','1.13.4.0'))
         (left.source/'items.xml').write_text('<Items><Override><Item identifier="shared" variantof="base"/></Override></Items>')
-        self.assertEqual(self.result(left,right)['loading']['status'],'limited')
+        self.assertEqual(self.result(left,right)['loading']['status'],'missing_parent')
 
     def test_repeated_unidentified_children_are_flagged_and_missing_attribute_is_not_zero(self):
         a=ET.fromstring('<Item identifier="shared"><Price value="5"/><Price value="8"/></Item>')

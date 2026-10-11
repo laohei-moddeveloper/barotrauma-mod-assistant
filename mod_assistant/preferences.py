@@ -25,6 +25,10 @@ def normalize_preferences(value):
     result['snapshot_directory']=backup if isinstance(backup,str) and (not backup or Path(backup).is_absolute()) else ''
     history=result.get('snapshot_locations',[])
     result['snapshot_locations']=list(dict.fromkeys(path for path in history if isinstance(path,str) and Path(path).is_absolute()))[:10] if isinstance(history,list) else []
+    labels=result.get('mod_labels',{})
+    result['mod_labels']={item:label for item,label in labels.items()
+                          if isinstance(item,str) and len(item)<=100 and isinstance(label,str) and len(label)<=160
+                          and not any(ord(char)<32 for char in label)} if isinstance(labels,dict) and len(labels)<=2000 else {}
     return result
 
 

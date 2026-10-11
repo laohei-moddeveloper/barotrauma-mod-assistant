@@ -250,20 +250,36 @@ class OrderDialog:
             labels=['手工判断','用户记录的作者说明','用户记录的实测']; methods=['manual','author','local_test']
             self.app.label(popup,'依据类型').grid(row=3,column=0,padx=12,pady=8,sticky='w')
             method=ttk.Combobox(popup,state='readonly',values=labels); method.current(methods.index(entry['method'])); method.grid(row=3,column=1,padx=12,sticky='ew')
-            scoped=tk.BooleanVar(value=bool(entry.get('game_version') or entry.get('versions')))
-            tk.Checkbutton(popup,text='限定为当前游戏与这两个模组的已安装版本',variable=scoped,wraplength=570,justify='left').grid(row=4,column=0,columnspan=2,padx=12,pady=12,sticky='w')
-            self.app.label(popup,'记录是用户提供的依据，不是助手认证。版本变化后将停止沿用；版本号相同仍可能有文件变化。',wraplength=570,justify='left').grid(row=5,column=0,columnspan=2,padx=12,pady=8,sticky='w')
+            scoped=tk.BooleanVar(value=bool(entry.get('game_version') or entry.get('versions') or entry.get('fingerprints')) or tuple(pair) not in records)
+            tk.Checkbutton(popup,text='限定为当前游戏、模组版本与相关文件',variable=scoped,wraplength=570,justify='left').grid(row=4,column=0,columnspan=2,padx=12,pady=12,sticky='w')
+            self.app.label(popup,'记录是用户提供的依据，不是助手认证。读取 XML、Lua、C# 与 DLL 摘要；相关文件改变后停止沿用。',wraplength=570,justify='left').grid(row=5,column=0,columnspan=2,padx=12,pady=8,sticky='w')
             def done():
-                current=installed_context(self.app.env,{item:data['mod'] for item,data in self.app.mods.items()},
-                                          {'evidence':[{'versions':dict.fromkeys(pair,'current')}]})
-                if scoped.get() and (not game_version(self.app.env) or any(not current[item].installed_version for item in pair)):
-                    self.app.dialogs.showerror('规则无法应用','游戏或模组版本缺失，不能建立完整版本范围。请取消限定并记录具体来源。',parent=popup); return
-                value={**entry,**{key:field.get() for key,field in fields.items()},'method':methods[method.current()],
-                       'game_version':game_version(self.app.env) if scoped.get() else '',
-                       'versions':{item:current[item].installed_version for item in pair} if scoped.get() else {}}
-                try: check_rules({'before':[pair],'evidence':[value]})
-                except AssistantError as error: self.app.dialogs.showerror('规则无法应用',str(error),parent=popup); return
-                records[tuple(pair)]=value; popup.destroy(); window.grab_set()
+                if self.app.task_active or self.app.worker and self.app.worker.is_alive():return
+                bounded=scoped.get()
+                value={**entry,**{key:field.get() for key,field in fields.items()},'method':methods[method.current()]}
+                mods={item:data['mod'] for item,data in self.app.mods.items()}
+                def compute():
+                    try:
+                        from .file_evidence import SCOPE,game_context_evidence
+                        if bounded:
+                            context=installed_context(self.app.env,mods,{'evidence':[{'versions':dict.fromkeys(pair,'current'),
+                                'fingerprints':{item:{'scope':SCOPE,'digest':'0'*64} for item in pair}}]},self.app.cancel)
+                            if any(not context[item].evidence_complete for item in pair):raise AssistantError('相关文件未完整读取，不能保存限定依据')
+                            value['game_version']=game_version(self.app.env)
+                            value['versions']={item:context[item].installed_version for item in pair if context[item].installed_version}
+                            value['fingerprints']={item:{'scope':SCOPE,'digest':context[item].evidence_digest} for item in pair}
+                            game_context=game_context_evidence(self.app.env,mods.values(),self.app.cancel)
+                            if not game_context['complete']:raise AssistantError('核心文件未完整读取，不能保存限定依据')
+                            value['context']={'scope':game_context['scope'],'digest':game_context['digest']}
+                        else:
+                            value.update(game_version='',versions={},fingerprints={});value.pop('context',None)
+                        checked=check_rules({'before':[pair],'evidence':[value]})['evidence'][0]
+                        def save():
+                            if popup.winfo_exists():records[tuple(pair)]=checked;popup.destroy();window.grab_set()
+                        self.app.events.put({'kind':'ui_callback','callback':save})
+                    except Exception as error:
+                        self.app.events.put({'kind':'ui_callback','callback':lambda caught=error:self.app.report_error(caught,'记录排序依据')})
+                self.app.work(compute)
             self.app.button(popup,'保存依据',done,busy=False).grid(row=6,column=0,columnspan=2,pady=15)
             popup.protocol('WM_DELETE_WINDOW',lambda:(popup.destroy(),window.grab_set())); self.app.skin(popup)
         def commit():
@@ -310,7 +326,7 @@ class OrderDialog:
             result=None; error=None
             try:
                 version=game_version(self.app.env)
-                context=installed_context(self.app.env,mods,rules)
+                context=installed_context(self.app.env,mods,rules,self.app.cancel)
                 result=suggest_order(ids,context,features,rules,self.app.cancel,version)
                 validate_order(result.ids,self.original,rules,context,version)
             except Exception as caught: error=caught
@@ -338,7 +354,7 @@ class OrderDialog:
         try:
             if Path(path).stat().st_size>2*1024*1024:raise AssistantError('排序规则文件过大')
             data=json.loads(Path(path).read_text(encoding='utf-8-sig'))
-            if data.get('schema') not in ('baropy-order-rules-v1',SCHEMA):raise AssistantError('排序规则格式不受支持')
+            if data.get('schema') not in ('baropy-order-rules-v1','barodock-order-rules-v2',SCHEMA):raise AssistantError('排序规则格式不受支持')
             rules=check_rules(data)
             result=suggest_order(self.original,{item:d['mod'] for item,d in self.app.mods.items()},self.app.features,rules,game_version=game_version(self.app.env))
             detail=f'将替换本地规则：{len(rules["before"])} 条前后规则，{len(rules["locks"])} 个锁定。导入不会修改游戏顺序；请预览后另行保存。'

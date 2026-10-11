@@ -120,7 +120,7 @@ class MainInterface:
         for title,command in [('全选',app.select_all),('只选已启用',app.select_enabled),('清空',app.select_none)]:
             app.button(controls,title,command).pack(side='left',padx=(0,6))
         app.filter=app.locale.variable(app.root,value='全部模组')
-        filters=ttk.Combobox(controls,textvariable=app.filter,values=['全部模组','已启用','未启用','需要处理'],
+        filters=ttk.Combobox(controls,textvariable=app.filter,values=['全部模组','已启用','未启用','需要处理','有 Override 声明','脚本待实测','资料待刷新','有本地标记'],
                              state='readonly',width=10); filters.pack(side='left',padx=(8,8))
         app.search_entry=tk.Entry(controls,textvariable=app.search,bg=PANEL,fg=TEXT,relief='flat',
                                   insertbackground=TEXT,font=('Microsoft YaHei UI',10),width=22)
@@ -164,7 +164,7 @@ class MainInterface:
         app.tree.bind('<Button-3>',self.context_menu)
         self.context=tk.Menu(app.tree,tearoff=False)
         for title,command in [('复制名称与编号',app.copy_selected),('启用 / 禁用选中模组',app.toggle_selected),('查看完整分析',app.show_full_analysis),
-                              ('调整加载顺序',app.show_order)]: self.context.add_command(label=title,command=command)
+                              ('谁需要或关联此模组',app.show_dependents),('设置本地标记',app.set_mod_label),('调整加载顺序',app.show_order)]: self.context.add_command(label=title,command=command)
 
     def build_tools(self):
         app=self.app; body=self.scroll_page(self.tools_page)

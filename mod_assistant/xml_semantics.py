@@ -1,17 +1,18 @@
 """Bounded structural changes and an explicitly scoped Item loading model.
 
 The model follows GenericPrefabFile/PrefabSelector, not text similarity or
-script regex. It does not evaluate prefab constructors, inheritance or Clear.
+script regex. Item XML inheritance and Clear are modeled separately; prefab
+constructors, executable scripts and gameplay behavior are not evaluated.
 """
 from collections import Counter
 import os
 from pathlib import PurePosixPath
 import xml.etree.ElementTree as ET
-from .core import AssistantError, reject_link, within
+from .core import AssistantError, Cancelled, reject_link, within
 from .xml_compare import DefinitionTree
 
 SOURCE = 'https://github.com/FakeFishGames/Barotrauma/blob/1fd2a51bbb1b44bac9ff3606f697bfa96142e7af/Barotrauma/BarotraumaShared/SharedSource/Prefabs/PrefabSelector.cs'
-FIELD_SOURCE = 'https://github.com/FakeFishGames/Barotrauma/blob/master/Barotrauma/BarotraumaShared/SharedSource/Items/ItemPrefab.cs'
+FIELD_SOURCE = 'https://github.com/FakeFishGames/Barotrauma/blob/e6e95da83b1b5ca8b55ec52653c7cf6b40e30247/Barotrauma/BarotraumaShared/SharedSource/Items/ItemPrefab.cs'
 ITEM_FIELDS = {
     '/item/@health':'物品耐久声明；默认 100，读取上限 1000000',
     '/item/@maxstacksize':'物品堆叠上限声明；默认 1，游戏还会限制允许范围',
@@ -49,6 +50,12 @@ def records(folder,feature,key,check,load=load_tree):
     for relative in feature.definition_files.get('|'.join(key),[]):
         root,size=load(folder,relative,check); total+=size
         if total>MAX_TOTAL: raise AssistantError('XML 语义读取总量超过上限')
+        if key[:2]==('item','item'):
+            from .item_model import item_nodes,attribute
+            for kind,node,mode in item_nodes(root,check):
+                if kind=='item' and attribute(node,'identifier').strip().casefold()==key[2]:
+                    result.append({'file':relative,'override':mode,'node':node})
+            continue
         def walk(node,overriding=False):
             nonlocal special
             check(); tag=node.tag.casefold()
@@ -208,12 +215,77 @@ def compare_semantics(env,left_folder,left,right_folder,right,key,providers,orde
         special|=flags
     chain.sort(key=lambda row:order.index(row['id']))
     from .profiles import capture_profile,game_version
+    current=None
     try:
         current=capture_profile(env)
         if current.get('core') is not None: complete=False; notes.append('当前使用自定义核心包，原版基线不能代表完整加载环境。')
     except (OSError,ValueError,AssistantError) as error:
         complete=False; notes.append('启用配置未能核对：'+str(error))
     result=loading_result(key,chain,base,complete,special or special_a or special_b,game_version(env))
+    item_report=None;baseline_name='Vanilla'
+    if config_known and current is not None and key[:2]==('item','item') and game_version(env)=='1.13.4.0':
+        try:
+            from .item_model import build_registry,explain_identifier
+            from .mod_analysis import _resource_path
+            from .core import package_names
+            indexed={item:(folder,feature) for item,folder,feature in providers}
+            packages=[]
+            core=current.get('core')
+            if core:
+                folder,feature=indexed[core['id']]
+                manifest,_=load(folder,'filelist.xml',check)
+                core_id,core_name=core['id'],core['name']
+            else:
+                folder=env.game
+                manifest,_=load(folder,'Content/ContentPackages/Vanilla.xml',check)
+                core_id,core_name='vanilla','Vanilla'
+            def files_for(folder,manifest,item):
+                name,aliases=package_names(manifest,item)
+                files=[]
+                for entry in manifest:
+                    check()
+                    if entry.tag.casefold()!='item':continue
+                    value=entry.get('file','').replace('\\','/')
+                    if item=='vanilla':
+                        if not value.casefold().startswith('content/'):raise AssistantError('核心资源路径不受支持')
+                        relative=value
+                    else:
+                        path=_resource_path(folder,value,name,(item,*aliases))
+                        if path is None:raise AssistantError('Item 资源文件未完整定位：'+value)
+                        relative=path.relative_to(folder).as_posix()
+                    root,_=load(folder,relative,check);files.append((relative,root))
+                return files
+            packages.append({'id':core_id,'name':core_name,'folder':folder,'index':-1,'files':files_for(folder,manifest,core_id)})
+            for position,item in enumerate(order):
+                if item not in indexed:raise AssistantError('启用资料未完整读取')
+                folder,feature=indexed[item]
+                if folder is None:raise AssistantError('启用资料未完整读取')
+                manifest,_=load(folder,'filelist.xml',check)
+                packages.append({'id':item,'name':feature.name,'folder':folder,'index':position,'files':files_for(folder,manifest,item)})
+            registry=build_registry(packages,check)
+            if core:
+                baseline_name=core_name
+                core_records=[row for row in registry['definitions'].get(key[2],[]) if row['index']==-1]
+                base=[{'file':row['file'],'node':row['node'],'override':row['override']} for row in core_records]
+                changes,ambiguous=field_changes(a[0]['node'],b[0]['node'],base[0]['node'] if len(base)==1 else None,check)
+            item_report=explain_identifier(registry,key[2],check)
+            if item_report['status']=='selected':
+                from .resource_evidence import item_references
+                resolved=registry['resolve'](key[2])
+                roots={row['id']:row for row in packages}
+                for item,mod_folder,feature in providers:
+                    if mod_folder is not None and item not in roots:
+                        roots[item]={'folder':mod_folder,'name':feature.name}
+                item_report['references']=item_references(resolved['node'],env,resolved['record']['id'],roots,registry,check)
+            result={'status':item_report['status'],'winner':item_report['winner'],'message':item_report['message']}
+            if item_report['status']!='selected':result['winner']=''
+            if core:notes=[note for note in notes if '自定义核心包' not in note]
+            if item_report['status'] not in ('limited','ambiguous'):
+                notes=[note for note in notes if not note.startswith('需要专项处理的结构：')]
+        except Cancelled:raise
+        except (OSError,AssistantError,KeyError,ET.ParseError) as error:
+            notes.append('专项加载模型未完成：'+str(error))
+            result={'status':'limited','winner':'','message':'专项加载模型未完成，原始字段仍可对照。'}
     if key[:2]==('item','item') and game_version(env)=='1.13.4.0':
         for change in changes:
             if change['path'] in ITEM_FIELDS: change['meaning']=ITEM_FIELDS[change['path']]
@@ -229,14 +301,21 @@ def compare_semantics(env,left_folder,left,right_folder,right,key,providers,orde
         reject_link(env.game/'config_player.xml')
         with (env.game/'config_player.xml').open('rb') as stream: latest=stream.read(2*1024*1024+1)
         if latest!=config_bytes: raise AssistantError('启用顺序在对照期间变化，请重新分析')
+    model_source=SOURCE
+    if item_report:
+        from .item_model import SOURCE as model_source
     return {'changes':changes,'ambiguous':ambiguous,'notes':notes,'baseline_files':[row['file'] for row in base],
+            'key':key,'game_version':game_version(env),'providers':[{'id':item,'name':feature.name} for item,folder,feature in providers],
+            'item_result':item_report,
+            'baseline_name':baseline_name,
             'loading':result,'chain':[{'id':row['id'],'name':row['name'],
                                       'files':[{'file':record['file'],'override':record['override']} for record in row['records']]} for row in chain],
-            'source':SOURCE,'field_source':FIELD_SOURCE}
+            'source':model_source,'field_source':FIELD_SOURCE}
 
 
 def format_semantics(report,tr=lambda value:value):
     lines=[tr('字段变化与定义来源'),tr(report['loading']['message'])]
+    lines.append(tr('字段基线内容包：')+report.get('baseline_name','Vanilla'))
     lines.extend(tr(value) for value in report['loading'].get('limits',[]))
     if report['loading']['winner']: lines.append(tr('XML 注册模型选取的定义：')+report['loading']['winner'])
     lines.append(tr('当前启用顺序中的来源：'))
@@ -246,11 +325,26 @@ def format_semantics(report,tr=lambda value:value):
     for row in report['changes']:
         if row.get('meaning'): lines.append(tr(row['meaning']))
         lines.extend([row['path']+' · '+tr(row['kind']),
-                      tr('原版：')+(row['baseline'] if row['baseline'] is not None else '[not declared]'),
+                      tr('基线：')+(row['baseline'] if row['baseline'] is not None else '[not declared]'),
                       tr('左方：')+(row['left'] if row['left'] is not None else '[not declared]'),
                       tr('右方：')+(row['right'] if row['right'] is not None else '[not declared]')])
     if not report['changes']: lines.append(tr('所比较的声明字段没有差异。'))
-    for file in report.get('baseline_files',[]): lines.append(tr('原版定义文件：')+file)
+    item=report.get('item_result')
+    if item:
+        for error in item.get('package_errors',[]):lines.append(tr('来源包注册错误：')+error['identifier']+' · '+error['file'])
+        if item['parents']:lines.append(tr('继承来源：')+' → '.join(item['parents']))
+        if item['final_fields']:
+            lines.append(tr('选中定义的字段（含已解析继承）：'))
+            for path,value in item['final_fields'].items():lines.append(path+' = '+value)
+        for row in item['lost_changes']:
+            lines.extend([tr('未进入选中定义的修改：')+row['name']+' · '+row['file'],
+                          row['path']+' = '+row['declared'],tr('选中值：')+(row['selected'] or '[not declared]')])
+        from .resource_evidence import LABELS
+        for row in item.get('references',[]):
+            lines.append(tr(row['kind'])+' · '+row['path']+' = '+row['declared'])
+            lines.append(tr(LABELS[row['status']])+' · '+row['provider']+' · '+row['file'])
+        if item.get('references'):lines.append(tr('引用检查只描述读取范围内的路径和定义，不模拟脚本生成资源或配方执行。'))
+    for file in report.get('baseline_files',[]): lines.append(tr('基线定义文件：')+file)
     lines.extend(tr(note) for note in report['notes'])
     lines.extend([tr('未声明字段不等于数值为零；默认值和继承需另行核对。'),
                   tr('注册模型检查定义选取与重复注册，不验证构造函数、资源加载或实际游戏运行。'),tr('加载规则来源：')+report['source']])

@@ -30,9 +30,14 @@ def definition_text(folder, feature, key, check=lambda:None):
         if len(raw)>8_000_000: raise AssistantError('XML 对照文件过大，请在编辑器中查看')
         document=ET.fromstring(raw,parser=ET.XMLParser(target=DefinitionTree()))
         found=[]
-        for node in document.iter():
+        if key[:2]==('item','item'):
+            from .item_model import item_nodes,attribute
+            nodes=[node for kind,node,mode in item_nodes(document,check) if kind=='item']
+        else:nodes=document.iter()
+        for node in nodes:
             check()
-            if node.tag.casefold()!=key[1] or node.get('identifier','').strip().casefold()!=key[2]: continue
+            identifier=attribute(node,'identifier') if key[:2]==('item','item') else node.get('identifier','')
+            if (key[:2]!=('item','item') and node.tag.casefold()!=key[1]) or identifier.strip().casefold()!=key[2]: continue
             for child in node.iter(): child.attrib=dict(sorted(child.attrib.items()))
             ET.indent(node); found.append(ET.tostring(node,encoding='unicode'))
         if not found: raise AssistantError('XML 定义在扫描后发生变化，请重新分析后对照')

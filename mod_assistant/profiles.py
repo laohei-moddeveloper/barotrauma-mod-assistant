@@ -22,11 +22,11 @@ def game_version(env):
 def installed_path(env, mod):
     return env.installed / mod.item_id if mod.item_id.isdecimal() else mod.source
 
-def reference(env, mod):
+def reference(env, mod, include_receipts=True):
     path = installed_path(env, mod)
     package = load_package(path) if path and (path / 'filelist.xml').is_file() else None
     fingerprint = ''
-    if mod.item_id.isdecimal() and path and path.exists():
+    if include_receipts and mod.item_id.isdecimal() and path and path.exists():
         try:
             receipt = json.loads((env.work/'receipts'/(mod.item_id+'.json')).read_text(encoding='utf-8'))
             if receipt.get('installed_snapshot') == {name:list(value) for name,value in files_snapshot(path).items()}:
@@ -36,7 +36,7 @@ def reference(env, mod):
             'assistant_fingerprint':fingerprint,
             'core': package.get('corepackage', 'false').casefold() == 'true' if package is not None else False}
 
-def capture_profile(env, name='当前配置', mods=None):
+def capture_profile(env, name='当前配置', mods=None, *, include_receipts=True, cancel=None):
     mods = mods if mods is not None else inventory(env)
     known = {mod.item_id: mod for mod in mods}
     original=(env.game/'config_player.xml').read_bytes()
@@ -51,9 +51,14 @@ def capture_profile(env, name='当前配置', mods=None):
     if (env.game/'config_player.xml').read_bytes()!=original: raise AssistantError('配置在读取时变化，请重新检测')
     if any(item not in known for item in order) or (key and key not in known):
         raise AssistantError('有启用模组尚未安装，无法保存完整配置')
+    def describe(mod):
+        if cancel and cancel.is_set():
+            from .core import Cancelled
+            raise Cancelled('证据读取已取消')
+        return reference(env,mod,include_receipts)
     return {'schema': SCHEMA, 'appid': APP_ID, 'name': str(name)[:100], 'game_version': game_version(env),
-            'core': reference(env, known[key]) if key else None,
-            'order': [reference(env, known[item]) for item in order],
+            'core': describe(known[key]) if key else None,
+            'order': [describe(known[item]) for item in order],
             'note': '配置记录启用状态和顺序；Steam 只能提供当前工坊版本，不能按此文件获取历史版本。'}
 
 def normalize_profile(data):

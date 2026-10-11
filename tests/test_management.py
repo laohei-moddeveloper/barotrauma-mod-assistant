@@ -263,25 +263,27 @@ class CacheAndEvidenceTests(Fixture):
 
     def test_corrupt_cache_and_no_prior_cache_light_scan(self):
         mod=self.make('101'); inspect_cached(self.env,[mod])
-        path=next((self.env.work/'analysis/features-v4').glob('*.json')); path.write_text('[]')
+        from mod_assistant.analysis_cache import SCHEMA as CACHE_SCHEMA
+        path=next((self.env.work/f'analysis/features-v{CACHE_SCHEMA}').glob('*.json')); path.write_text('[]')
         _,stats=inspect_cached(self.env,[mod]); self.assertEqual(stats['scanned'],1)
         path.write_text('{')
         with patch.object(Path,'rglob',side_effect=AssertionError('no tree walk')):
             features,_=inspect_cached(self.env,[mod],light=True)
         self.assertTrue(features['101'].partial)
 
-    def test_xml_override_winner_paths_and_unmarked_duplicate_risk(self):
+    def test_xml_pair_paths_and_duplicate_risk_do_not_select_a_global_winner(self):
         left=self.make('101'); right=self.make('102')
         a,b=inspect(left),inspect(right)
         self.assertEqual(pair_evidence(a,b)[0],3)
         (right.source/'items.xml').write_text('<Items><Override><Item identifier="shared" /></Override></Items>')
         b=inspect(right); self.assertEqual(pair_evidence(a,b)[0],1)
-        detail=pair_detail(a,b,['101','102']); self.assertEqual(detail['expected_xml_winner'],right.name)
+        detail=pair_detail(a,b,['101','102']); self.assertEqual(detail['expected_xml_winner'],'')
         self.assertEqual(detail['locations'][0]['right_files'],['items.xml'])
         (left.source/'items.xml').write_text('<Override><Item identifier="shared" /></Override>')
         a=inspect(left)
-        self.assertEqual(pair_detail(a,b,['102','101'])['expected_xml_winner'],right.name)
-        self.assertEqual(pair_detail(a,b,['101','102'])['expected_xml_winner'],left.name)
+        self.assertEqual(pair_detail(a,b,['102','101'])['expected_xml_winner'],'')
+        self.assertEqual(pair_detail(a,b,['101','102'])['expected_xml_winner'],'')
+        self.assertIn('XML 对照',pair_detail(a,b,['101','102'])['advice'])
 
     def test_csharp_disabled_and_compiled_code_are_not_claimed_compatible(self):
         mod=self.make('101'); (mod.source/'script.cs').write_text('class Example {}')
@@ -363,9 +365,10 @@ class FriendAndLogTests(Fixture):
         self.assertFalse(lua_verification(self.env)['runtime_verified'])
 
     def test_large_utf16_log_tail_is_bounded_and_decoded(self):
-        path=self.env.game/'large.log'; path.write_text('x'*2300000+'\nException Mod 101\n',encoding='utf-16')
+        path=self.env.game/'large.log'; path.write_text('x'*9_000_000+'\nException Mod 101\n',encoding='utf-16')
         result=diagnose(path,[self.make('101')],self.env)
         self.assertTrue(result['tail_only']); self.assertEqual(result['findings'][0]['possible_mods'],['Mod 101'])
+        self.assertLessEqual(sum(row['bytes'] for row in result['segments']),16*1024*1024)
 
 
 if __name__=='__main__': unittest.main()

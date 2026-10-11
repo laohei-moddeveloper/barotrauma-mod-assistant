@@ -8,6 +8,7 @@ import time
 import tkinter as tk
 from tkinter import messagebox
 from dataclasses import replace
+from contextlib import contextmanager
 from .core import Environment,atomic_json,inventory
 from .mod_analysis import inspect
 from .mod_order import suggest_order
@@ -25,8 +26,15 @@ def run(report_path):
     result={'ok':False,'version':VERSION,'fixture_only':True,'Steam_connected':False,'game_launched':False}
     original_state=application.STATE; original_error=messagebox.showerror; errors=[]
     root=None; app=None
-    try:
+    @contextmanager
+    def fixture_directory():
         with tempfile.TemporaryDirectory(prefix='BaroDock-evidence-') as temporary:
+            try:yield temporary
+            finally:
+                if app:
+                    for handler in list(app.logger.handlers):handler.close();app.logger.removeHandler(handler)
+    try:
+        with fixture_directory() as temporary:
             base=Path(temporary); env=Environment(base/'Steam',base/'game',[],base/'player')
             vanilla=env.game/'Content/ContentPackages/Vanilla.xml'; vanilla.parent.mkdir(parents=True)
             vanilla.write_text('<contentpackage name="Vanilla" gameversion="1.13.4.0"><Item file="Content/Items/base.xml" /></contentpackage>')
@@ -88,12 +96,37 @@ def run(report_path):
             finding=diagnose(log,mods,env,features)['findings'][0]
             assert {'101','102','vanilla'} <= {row['mod_id'] for row in finding['locations'] if row.get('identifier')=='shared'}
             result['logged_error_file_link_checked']=True
+            from .investigation import capture_scene,save_scene,read_scene,repair_candidates,compare_logs,compare_scenes
+            from .native_profiles import write_native
+            baseline_log=diagnose(log,mods,env,features)
+            scene=capture_scene(env,mods,name='Frozen fixture',steps='Repeat inventory operation',log=baseline_log)
+            assert read_scene(save_scene(env,scene))['name']=='Frozen fixture'
+            repair_options=repair_candidates(baseline_log,scene['profile'],features)
+            assert len(repair_options)==2
+            write_native(env.game/'ModLists/Frozen-repair.xml',repair_options[0]['profile'])
+            with log.open('a') as stream:stream.write('Test operation completed\n')
+            after_log=diagnose(log,mods,env,features,baseline=baseline_log)
+            assert compare_logs(baseline_log,after_log)['not_reproduced']
+            after_scene=capture_scene(env,mods,phase='after',log=after_log)
+            assert compare_scenes(scene,after_scene)['same_recorded_inputs']
+            result['investigation_repair_and_append_recheck']=True
+            from .runtime_capture import create_diagnostic,read_runtime_capture,compare_runtime
+            folder=create_diagnostic(env,['shared'])
+            assert not (folder/'Lua/ForcedAutorun').exists()
+            atomic_json(base/'observation.json',{'schema':'barodock-runtime-v1','capture_id':'fixture','captured_unix':1791700000,
+                'packages':[{'name':'Vanilla','version':'1','index':0,'manifest':'Content/ContentPackages/Vanilla.xml'}],
+                'items':[{'requested':'shared','missing':True}]})
+            observed=compare_runtime(env,read_runtime_capture(base/'observation.json'))
+            assert len(observed['configured_but_not_observed'])==2
+            result['optional_observer_export_import']=True
             assert hashlib.sha256(config.read_bytes()).hexdigest()==before
             result.update(ok=True,configuration_unchanged=True,languages=['en','zh'],frozen=bool(getattr(__import__('sys'),'frozen',False)))
             app.close(); root=None
             for handler in list(app.logger.handlers): handler.close(); app.logger.removeHandler(handler)
     except Exception as error:
         result['error']=repr(error)
+        import traceback
+        result['traceback']=traceback.format_exc()
     finally:
         if root is not None:
             if app and app.worker and app.worker.is_alive(): app.cancel.set(); app.worker.join(3)

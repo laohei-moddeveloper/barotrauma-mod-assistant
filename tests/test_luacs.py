@@ -10,6 +10,13 @@ from mod_assistant.luacs import LuaCsInstaller, MODERN_SETTINGS, status, restore
 
 
 class LuaCsTests(unittest.TestCase):
+    def test_runtime_marker_scan_is_streamed_and_handles_chunk_boundaries(self):
+        from mod_assistant.luacs import assembly_markers
+        path=self.env.game/'Barotrauma.dll'
+        path.write_bytes(b'x'*(256*1024-2)+b'LuaCs CsRunPolicy')
+        self.assertEqual(assembly_markers(path,self.env.game),{b'LuaCs',b'CsRunPolicy'})
+        with self.assertRaises(AssistantError):assembly_markers(path,self.env.game,limit=1024)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         root = Path(self.temp.name)

@@ -2,6 +2,8 @@
 
 面向 Windows 64 位 Steam 版《潜渊症》（Barotrauma）的独立模组管理工具。当前版本 **0.10.0**。
 
+本分支正在验证 **0.11.0-preview.1**，尚未替换公开稳定版。新排查记录、文件依据、Item 继承/覆盖结果、兼容草稿和可选游戏内观察见 [排查工作流](docs/investigation-workflows.md)。
+
 0.10.0 增加可追溯的排序依据、只读战役存档关联及具体 XML/日志定位，纠正目录引用被当成加载顺序的推断。实现和适用边界见 [工作流程说明](docs/evidence-workflows.md)。
 
 [English guide](README_EN.md) · 程序右上角可在「中文 / English」之间实时切换，自动保存语言选择。

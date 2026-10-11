@@ -8,7 +8,7 @@ from tkinter import font as tkfont, ttk
 THEMES = {'ocean': '深海蓝', 'graphite': '石墨灰', 'daylight': '明亮'}
 COLUMNS = ('check', 'enable', 'name', 'kind', 'importance', 'compat',
            'version', 'installed', 'size', 'stage', 'progress')
-TITLES = ('更新', '启用', '模组', '类型', '重要程度', '兼容性',
+TITLES = ('更新', '启用', '模组', '类型', '角色依据', '兼容性',
           '缓存版本', '已安装版本', '大小', '状态', '进度')
 DEFAULTS = {'theme': 'ocean', 'accent': '#57dac4', 'font_size': 10,
             'density': 'comfortable', 'show_logs': False,

@@ -92,3 +92,25 @@ def applicable(rule, active, mods, context=None):
     value=condition_value(rule['condition'],labels,ambiguous)
     target=rule['id'] or unique.get(rule['name'].casefold())
     return value,target,not rule['id'] and rule['name'].casefold() in ambiguous
+
+
+def reverse_relations(target,mods,features):
+    """List explicit installed declarations, including inactive conditions."""
+    active={item for item,mod in mods.items() if mod.enabled}
+    unique,ambiguous=rule_context(mods)
+    context=(unique,ambiguous,set(active)|{name for name,item in unique.items() if item in active})
+    rows=[];incomplete=[]
+    for item in sorted(mods):
+        feature=features.get(item)
+        if feature is None or feature.partial or feature.deferred or feature.rule_notes:incomplete.append(item)
+        if feature is None:continue
+        for rule in feature.declared_rules:
+            condition,match,is_ambiguous=applicable(rule,active,mods,context)
+            possible=is_ambiguous and rule['name'].casefold() in {name.casefold() for name in (mods[target].name,*mods[target].aliases)}
+            if match!=target and not possible:continue
+            rows.append({'id':item,'name':mods[item].name,'enabled':item in active,'type':rule['type'],
+                         'condition':condition,'expression':rule['condition'],'ambiguous_target':is_ambiguous,'source':rule['source']})
+        if target in feature.workshop_dependencies:
+            rows.append({'id':item,'name':mods[item].name,'enabled':item in active,'type':'workshop_dependency',
+                         'condition':True,'expression':'','ambiguous_target':False,'source':'Steam Workshop'})
+    return {'rows':rows,'incomplete':incomplete}

@@ -451,23 +451,8 @@ class App:
         features=dict(self.features)
         def work():
             report=diagnose(path,mods,self.env,features,self.cancel)
-            lines=[report['file'],redact(report['path'],self.env),'日志修改时间（UTC）：'+report['modified_utc'],
-                   f"读取起始字节：{report['byte_offset']} · {report['encoding']}",report['note'],'']
-            if report['changed_during_read']: lines.append('日志在读取期间发生变化；可重新选择最新日志再检查。')
-            if summary and summary.get('errors'):
-                lines+=['最近助手更新未完成项：']+[f'{item}：{error}' for item,error in summary['errors'].items()]+['']
-            for finding in report['findings']:
-                position=f"全文行 {finding['line_in_file']}" if finding['line_in_file'] is not None else f"片段行 {finding['line_in_tail']}"
-                lines += ['['+finding['category']+'] '+position,finding['evidence'],
-                          '可能相关模组：'+('、'.join(finding['possible_mods']) or '未确定'),finding['text'],
-                          '建议：'+finding['advice'],'']
-                for location in finding['locations']:
-                    lines.append(location['kind']+'：'+location['mod_name']+' ['+location['mod_id']+'] '+location['file'])
-                    if location.get('identifier'): lines.append('标识符：'+location['identifier'])
-                    if location.get('source_line'): lines.append('日志报告的源码行：'+str(location['source_line']))
-                lines+=finding['steps']+['']
-            if not report['findings']: lines.append('读取片段未发现已识别的错误关键词；这不代表游戏运行无错误。')
-            self.events.put({'kind':'text_report','title':'游戏 / LuaCs 日志诊断','text':'\n'.join(lines)})
+            from .investigation_ui import InvestigationDialog
+            self.events.put({'kind':'ui_callback','callback':lambda:InvestigationDialog(self,path,report)})
         self.work(work)
 
     def verify_luacs(self):
@@ -489,13 +474,18 @@ class App:
             filtered = (not self.config_ready and filter_value in ('已启用','未启用')
                         or filter_value == '已启用' and not mod.enabled
                         or filter_value == '未启用' and mod.enabled
+                        or filter_value == '有本地标记' and not self.settings.get('mod_labels',{}).get(item)
+                        or filter_value == '有 Override 声明' and not (self.features.get(item) and self.features[item].overrides)
+                        or filter_value == '脚本待实测' and not (self.features.get(item) and (self.features[item].code_files or self.features[item].opaque_code))
+                        or filter_value == '资料待刷新' and not (self.features.get(item) is None or self.features[item].partial or self.features[item].deferred)
                         or filter_value == '需要处理' and not (
                             any(word in data['stage'] for word in ('待更新', '待同步', '失败', '需要检查', '超时',
                                                                  '未安装', '等待 Steam', '等待下载', '已停止'))
                             or assessment and assessment.compatibility.startswith('低')))
             feature = self.features.get(item)
             kinds = assessment.kinds if assessment else feature.kinds if feature else ()
-            searchable = (mod.name+' '+item+' '+' '.join(kinds)+' '+' '.join(self.tr(kind) for kind in kinds)).casefold()
+            role=assessment.importance if assessment else ''
+            searchable = (mod.name+' '+item+' '+' '.join(kinds)+' '+' '.join(self.tr(kind) for kind in kinds)+' '+role+' '+self.tr(role)+' '+self.settings.get('mod_labels',{}).get(item,'')).casefold()
             if filtered or search and not all(term in searchable for term in search):
                 if item in existing:
                     self.tree.delete(item)
@@ -588,13 +578,32 @@ class App:
             assessment = self.assessments.get(mod.item_id)
             if assessment:
                 self.detail.set(mod.name + "  ·  类型：" + "、".join(assessment.kinds) +
-                                "  ·  重要程度（影响范围估计）：" + assessment.importance +
+                                "  ·  角色依据：" + assessment.importance +
                                 "  ·  兼容性：" + assessment.compatibility +
                                 f"（已比对 {assessment.compared} 个其他模组）\n" +
                                 "；".join(assessment.reasons[:2]) +
+                                ('\n'+self.tr('本地标记：{0}').format(self.settings.get('mod_labels',{}).get(mod.item_id,'')) if self.settings.get('mod_labels',{}).get(mod.item_id) else '')+
                                 ("\n" + data["detail"] if data["detail"] else ""))
             else:
                 self.detail.set(mod.name + "  ·  " + data["stage"])
+
+    def set_mod_label(self):
+        selected=self.tree.selection()
+        if len(selected)!=1:return
+        from tkinter import simpledialog
+        from .i18n import Dialogs
+        item=selected[0]
+        value=Dialogs(self.locale,simpledialog).askstring('本地标记','设置仅供自己搜索的标记；留空清除，不影响启用与排序。',
+            initialvalue=self.settings.get('mod_labels',{}).get(item,''),parent=self.root)
+        if value is None:return
+        if len(value)>160 or any(ord(char)<32 for char in value):
+            self.dialogs.showinfo('本地标记','标记最多 160 个字符，不能包含控制字符。',parent=self.root);return
+        labels=self.settings.setdefault('mod_labels',{})
+        if value.strip() and item not in labels and len(labels)>=2000:
+            self.dialogs.showinfo('本地标记','本地标记已达 2000 项，请先清除不再使用的标记。',parent=self.root);return
+        if value.strip():labels[item]=value.strip()
+        else:labels.pop(item,None)
+        self.save_settings();self.render();self.show_detail()
 
     def show_full_analysis(self):
         highlighted = self.tree.selection()
@@ -609,7 +618,7 @@ class App:
             return
         lines = [mod.name, "模组编号：" + item,
                  "类型：" + "、".join(assessment.kinds),
-                 "重要程度（内容影响范围）：" + assessment.importance,
+                 "角色依据：" + assessment.importance,
                  "兼容等级：" + assessment.compatibility,
                  '证据状态：'+assessment.evidence,
                  f"已比对 {assessment.compared} 个其他模组，其中 {assessment.risky_pairs} 对存在可解释的重叠信号。",
@@ -639,6 +648,24 @@ class App:
         self.locale.bind_text(content, "\n".join(lines), [data["mod"].name for data in self.mods.values()])
         content.configure(state="disabled")
         self.skin(dialog)
+
+    def show_dependents(self):
+        selection=self.tree.selection()
+        if len(selection)!=1:return
+        from .author_rules import reverse_relations
+        item=selection[0];mods={key:data['mod'] for key,data in self.mods.items()}
+        report=reverse_relations(item,mods,self.features)
+        titles={'requirement':'作者顺序前置声明','requiredAnyOrder':'作者必需声明，不限制顺序','patch':'作者补丁关系声明',
+                'conflict':'作者冲突声明','workshop_dependency':'工坊依赖条目，不自动推导排序'}
+        lines=[mods[item].name+' ['+item+']',self.tr('以下仅列已安装项目中读取到的明确声明；没有声明不代表没有依赖。')]
+        for row in report['rows']:
+            lines.extend(['',row['name']+' ['+row['id']+'] · '+self.tr('已启用' if row['enabled'] else '未启用'),
+                          self.tr(titles[row['type']])+' · '+row['source']])
+            if row['expression']:lines.append(self.tr('条件：')+row['expression'])
+            lines.append(self.tr('目标同名，需核对具体项目' if row['ambiguous_target'] else '条件当前成立' if row['condition'] is True else '条件当前不成立' if row['condition'] is False else '条件语法未支持，需核对作者说明'))
+        if not report['rows']:lines.append(self.tr('读取范围内没有其他项目声明此关系。'))
+        if report['incomplete']:lines.append('\n'+self.tr('依赖资料尚未完整读取：')+'、'.join(report['incomplete']))
+        self.text_report('谁需要或关联此模组', '\n'.join(lines))
 
     def export_analysis(self):
         if not self.assessments:

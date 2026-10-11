@@ -99,6 +99,19 @@ class LuaCsStatus:
         return self.csharp if self.policy in ('Enabled','Disabled') else None
 
 
+def assembly_markers(path,root,limit=64*1024*1024):
+    """Bounded stable byte markers, not assembly execution or code analysis."""
+    from .file_evidence import read_stable
+    markers=(b'LuaCs',b'CsRunPolicy');found=set();tail=b''
+    def inspect_chunk(chunk):
+        nonlocal tail
+        data=tail+chunk
+        found.update(marker for marker in markers if marker in data)
+        tail=data[-(max(map(len,markers))-1):]
+    read_stable(path,root,limit=limit,inspect_chunk=inspect_chunk)
+    return found
+
+
 def status(env: Environment) -> LuaCsStatus:
     policy='Unknown'
     def read_settings(path):
@@ -110,11 +123,11 @@ def status(env: Environment) -> LuaCsStatus:
         return ET.fromstring(data,parser=ET.XMLParser(target=DefinitionTree()))
     try:
         for name in ('Barotrauma.dll','BarotraumaCore.dll','MoonSharp.Interpreter.dll'): reject_link(env.game/name)
-        assembly = (env.game / "Barotrauma.dll").read_bytes()
+        assembly = assembly_markers(env.game/'Barotrauma.dll',env.game)
         runtime = b"LuaCs" in assembly and all(
             (env.game / name).is_file() for name in ("BarotraumaCore.dll", "MoonSharp.Interpreter.dll"))
     except (OSError,AssistantError):
-        assembly = b""
+        assembly = set()
         runtime = False
     try:
         if b"CsRunPolicy" in assembly or (env.game / MODERN_SETTINGS).exists():

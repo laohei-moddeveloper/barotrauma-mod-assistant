@@ -349,6 +349,11 @@ class Mod:
     installed_version: str = ""
     claimed_hash: str = ""
     aliases: tuple[str, ...] = ()
+    evidence_digest: str = ""
+    evidence_scope: str = ""
+    evidence_complete: bool = False
+    context_digest: str = ""
+    context_complete: bool = False
 
 def package_names(package,fallback):
     aliases=tuple(dict.fromkeys(value.strip() for value in package.get('altnames','').split(',') if value.strip()))

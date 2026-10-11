@@ -167,10 +167,26 @@ def _definitions(path: Path, category: str) -> set[tuple[str, str, str]]:
     return _definition_info(path, category)[0]
 
 
-def _definition_info(path: Path, category: str):
+def _definition_info(path: Path, category: str, coverage=None):
     found = set()
     overrides = set()
-    root = ET.parse(path).getroot()
+    from .xml_compare import DefinitionTree
+    reject_link(path)
+    with path.open('rb') as stream:raw=stream.read(8_000_001)
+    if len(raw)>8_000_000:raise AssistantError('XML 分析文件超过读取上限')
+    root = ET.fromstring(raw,parser=ET.XMLParser(target=DefinitionTree()))
+    if category=='item':
+        from .item_model import item_nodes,attribute
+        for kind,node,mode in item_nodes(root):
+            identifier=attribute(node,'identifier').strip()
+            if kind=='item' and (not identifier or not identifier.isascii()):
+                if coverage is not None:coverage['partial']=True
+                continue
+            identifier=identifier.casefold()
+            if kind=='item' and identifier:
+                key=('item','item',identifier);found.add(key)
+                if mode:overrides.add(key)
+        return found,overrides
     wrapped_elements = {element for node in root.iter() if node.tag.casefold() == 'override' for element in node.iter()}
     candidates = [root] + list(root)
     for child in list(root):
@@ -261,7 +277,9 @@ def inspect(mod: Mod, metadata: dict | None = None) -> Features:
                 if path.stat().st_size > 8_000_000:
                     result.partial = True
                     continue
-                definitions, overrides = _definition_info(path, tag)
+                coverage={}
+                definitions, overrides = _definition_info(path, tag,coverage)
+                result.partial |= bool(coverage.get('partial'))
                 result.definitions.update(definitions)
                 result.overrides.update(overrides)
                 for key in definitions:
@@ -295,8 +313,12 @@ def pair_evidence(left: Features, right: Features) -> tuple[int, str]:
         example = "、".join(sorted({definition[2] for definition in overlaps})[:2])
         category = "、".join(sorted({definition[0] for definition in overlaps})[:2])
         unmarked = overlaps - left.overrides - right.overrides
-        if unmarked:
-            signals.append((3, f"同标识普通定义 {len(unmarked)} 个（如 {example}），未声明 Override；排序通常不能解决重复注册"))
+        known_item={key for key in unmarked if key[:2]==('item','item')}
+        if known_item:
+            example="、".join(sorted({key[2] for key in known_item})[:2])
+            signals.append((3, f"同标识普通定义 {len(known_item)} 个（如 {example}），未声明 Override；排序通常不能解决重复注册"))
+        elif unmarked:
+            signals.append((1,'存在同标识声明；此内容类型未建立完整加载模型，请查看字段与作者说明。'))
         else:
             signals.append((1, f"XML 明确声明 Override，涉及 {len(overlaps)} 个{category}定义（如 {example}）；需确认期望覆盖结果"))
     return max((x[0] for x in signals),default=0), '；'.join(x[1] for x in signals)
@@ -308,6 +330,15 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
     known={mod.item_id:mod for mod in mods}
     names,ambiguous=rule_context(known)
     context=(names,ambiguous,active|{name for name,item in names.items() if item in active})
+    required_by=defaultdict(list)
+    for owner in active:
+        owner_feature=features.get(owner)
+        if owner_feature is None or owner_feature.partial or owner_feature.deferred:continue
+        for rule in owner_feature.declared_rules:
+            if rule['type'] not in ('requirement','requiredAnyOrder'):continue
+            applies,target,unclear=applicable(rule,active,known,context)
+            if applies is True and not unclear and target in known:
+                required_by[target].append(known[owner].name)
     pair_signals = defaultdict(list)
     # Only shared facts can trigger pair_evidence. Index those facts once, rather
     # than comparing every unrelated pair. Preserve original pair iteration order.
@@ -383,14 +414,17 @@ def evaluate(mods: list[Mod], features: dict[str, Features],
             reasons.append('脚本仅统计文件及运行条件；未分析执行逻辑，不能据此判定脚本之间的兼容性。')
         if not reasons:
             reasons.append(f"已与其他 {max(0, len(mods) - 1)} 个缓存模组比对可识别的 XML 定义，未发现直接重叠；仍需游戏内验证")
-        if feature.core or "框架/脚本" in feature.kinds:
-            importance = "关键组件"
-        elif len(feature.definitions) > 200 or len(set(feature.kinds) & SYSTEM_KINDS) >= 2:
-            importance = "高"
-        elif set(feature.kinds) <= {"语言/文本", "界面/音效", "其他", "补丁/调整"}:
-            importance = "低"
+        if feature.core:
+            importance = "核心内容包"
+        elif required_by[mod.item_id]:
+            importance = "声明的前置"
+            reasons.append('已启用模组明确声明需要此项目：'+'、'.join(dict.fromkeys(required_by[mod.item_id])))
+        elif any(rule['type']=='patch' for rule in feature.declared_rules):
+            importance = "作者声明的补丁"
+        elif feature.code_files or feature.opaque_code:
+            importance = "含脚本/程序库"
         else:
-            importance = "中"
+            importance = "内容模组"
         max_signal = max((score for score, _, _ in signals), default=0)
         active_signal = max((score for score, other, _ in signals if other.item_id in active), default=0)
         compatibility = ("低·声明冲突" if declared_conflicts else
@@ -416,22 +450,17 @@ def pair_detail(left, right, order, other_active=True):
     shared = left.definitions & right.definitions
     winner = ""
     supported=bool(shared) and all(key[:2]==('item','item') for key in shared)
-    if supported and other_active and left.item_id in order and right.item_id in order and shared <= left.overrides | right.overrides:
-        left_only = shared <= left.overrides and not shared & right.overrides
-        right_only = shared <= right.overrides and not shared & left.overrides
-        if left_only: winner = left.name
-        elif right_only: winner = right.name
-        elif shared <= left.overrides & right.overrides and left.item_id in order and right.item_id in order:
-            winner = left.name if order.index(left.item_id) < order.index(right.item_id) else right.name
+    # A pair lacks the core, Clear files, variants and other providers. The
+    # complete on-demand loading model is the only place that selects a result.
     special_override = any(key[0]=='afflictions' for key in shared) and bool(shared & (left.overrides|right.overrides))
     if special_override:
         winner = ''
-    if shared - left.overrides - right.overrides:
+    if any(key[:2]==('item','item') for key in shared - left.overrides - right.overrides):
         advice = "同标识普通定义需兼容补丁或禁用其中一个；移动顺序通常不足以解决。"
     elif special_override:
         advice = '含医疗/状态 Override：具体加载条件可能与物品不同。请核对作者说明和当前游戏版本；助手不单凭上下位置判定覆盖结果。'
-    elif winner:
-        advice = f"可识别的 XML Override 预计由 {winner} 优先；请确认这符合你的期望，多个 Override 可调整相对顺序。"
+    elif shared and supported:
+        advice = '已读取 Override 声明；请打开 XML 对照，结合核心包、全部启用来源、Clear 和继承计算具体结果。'
     elif shared and not supported:
         advice='此内容类型未建立完整加载模型；可查看具体 XML 字段与来源，不按位置猜测最终结果。'
     else:

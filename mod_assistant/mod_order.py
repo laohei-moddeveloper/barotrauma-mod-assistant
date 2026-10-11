@@ -244,7 +244,10 @@ def save_order(env: Environment, ids: list[str], process_guard=game_running) -> 
     current = read_order(env)
     from .core import inventory
     from .profiles import game_version
-    validate_order(ids,current,load_rules(env),{mod.item_id:mod for mod in inventory(env)},game_version(env))
+    rules=load_rules(env)
+    from .rule_evidence import installed_context
+    context=installed_context(env,{mod.item_id:mod for mod in inventory(env)},rules)
+    validate_order(ids,current,rules,context,game_version(env))
     if len(ids) != len(current) or set(ids) != set(current) or len(set(ids)) != len(ids):
         raise AssistantError("启用模组清单已经变化，请重新检测后排序")
     if ids == current:

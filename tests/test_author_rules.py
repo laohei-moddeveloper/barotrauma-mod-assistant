@@ -8,6 +8,26 @@ from mod_assistant.mod_order import suggest_order
 
 
 class AuthorRuleTests(Fixture):
+    def test_reverse_relations_show_inactive_conditional_and_workshop_declarations(self):
+        from mod_assistant.author_rules import reverse_relations
+        mods={item:self.make(item) for item in ('101','102','104')};mods['104'].enabled=False
+        features={item:inspect(mod) for item,mod in mods.items()}
+        features['104'].declared_rules=[{'type':'patch','id':'101','name':'','condition':"ifhas('999')",'source':'metadata.xml'}]
+        features['102'].workshop_dependencies={'101'}
+        before=self.config.read_bytes();report=reverse_relations('101',mods,features)
+        patch=next(row for row in report['rows'] if row['id']=='104')
+        self.assertFalse(patch['enabled']);self.assertFalse(patch['condition']);self.assertEqual(patch['type'],'patch')
+        self.assertTrue(any(row['type']=='workshop_dependency' for row in report['rows']))
+        reordered=reverse_relations('101',dict(reversed(list(mods.items()))),features)
+        self.assertEqual(report,reordered);self.assertEqual(before,self.config.read_bytes())
+
+    def test_reverse_relations_keep_ambiguous_target_and_unsupported_conditions_visible(self):
+        from mod_assistant.author_rules import reverse_relations
+        mods={item:self.make(item,name='Same' if item!='104' else 'User') for item in ('101','102','104')}
+        features={item:inspect(mod) for item,mod in mods.items()}
+        features['104'].declared_rules=[{'type':'requirement','id':'','name':'Same','condition':'unsupported()','source':'metadata.xml'}]
+        report=reverse_relations('101',mods,features)
+        self.assertEqual(len(report['rows']),1);self.assertTrue(report['rows'][0]['ambiguous_target']);self.assertIsNone(report['rows'][0]['condition'])
     def test_declared_patch_and_requirement_preview_without_automatic_enable_or_writes(self):
         mods={item:self.make(item) for item in ('101','102')}
         before=self.config.read_bytes()
