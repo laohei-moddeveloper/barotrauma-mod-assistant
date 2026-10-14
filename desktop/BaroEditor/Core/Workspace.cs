@@ -16,16 +16,18 @@ namespace BaroEditor
         public string Selected { get; set; }
         public Dictionary<string, NodePosition> Positions { get; set; } = new();
         public LocalizationData Localization { get; set; }
+        public string DraftXml { get; set; }
     }
     public sealed class GraphNode
     {
         public string Path, Parent;
         public XElement Xml;
         public int Depth;
+        public bool Floating;
         public string Name => Xml.Name.LocalName;
         public string Summary => EventDocument.Attribute(Xml, "text") is string text && text.Length > 0 ? text : EventDocument.Attribute(Xml, "identifier");
     }
-    public sealed class Workspace
+    public sealed partial class Workspace
     {
         public EventDocument Document { get; private set; }
         public string Scope { get; private set; } = "";
@@ -35,7 +37,13 @@ namespace BaroEditor
         private EventSearch search;
         private long searchRevision = -1;
         private long localizationRevision = -1;
-        private readonly List<(bool Xml, Dictionary<string, NodePosition> Before, Dictionary<string, NodePosition> After, string SelectionBefore, string SelectionAfter)> undo = new(), redo = new();
+        private sealed class Edit
+        {
+            public bool Xml, Draft;
+            public Dictionary<string, NodePosition> Before, After;
+            public string SelectionBefore, SelectionAfter, ScopeBefore, ScopeAfter;
+        }
+        private readonly List<Edit> undo = new(), redo = new();
         private string savedProject;
         private long savedLocalizationRevision;
         public bool CanUndo => undo.Count > 0;
@@ -45,9 +53,11 @@ namespace BaroEditor
         {
             Document = document; Scope = document.EventEntries().FirstOrDefault().Path ?? ""; Selected = Scope;
             Positions.Clear(); undo.Clear(); redo.Clear(); search = null; savedProject = null;
+            draft = new EventDocument("<BaroEditorDrafts/>");
+            draftSearch=null;
         }
-        public XElement Current => Document.Element(Selected);
-        public void Select(string path) { Document.Element(path); Selected = path; }
+        public XElement Current => Element(Selected);
+        public void Select(string path) { Element(path); Selected = path; }
         public void SetScope(string path) { Document.Element(path); Scope = path; Selected = path; }
         public IReadOnlyList<GraphNode> Nodes(string query, out bool limited, int limit = 400)
         {
@@ -58,7 +68,9 @@ namespace BaroEditor
                 visible = search.Find(query, Scope, out _, out _, 300);
             }
             var list = new List<GraphNode>(); var stack = new Stack<(XElement Xml, string Path, string Parent, int Depth)>();
-            stack.Push((Document.Element(Scope), Scope, null, 0)); limited = false;
+            limited = false;
+            AppendFloating(list, query, limit, ref limited);
+            stack.Push((Document.Element(Scope), Scope, null, 0));
             while (stack.Count > 0)
             {
                 var item = stack.Pop();
@@ -68,7 +80,7 @@ namespace BaroEditor
                 var children = item.Xml.Elements().ToArray();
                 for (int i = children.Length - 1; i >= 0; i--) stack.Push((children[i], item.Path.Length == 0 ? i.ToString() : item.Path + "/" + i, item.Path, item.Depth + 1));
             }
-            if (visible == null && limited && !list.Any(n => n.Path == Selected) && (Scope.Length == 0 || Selected == Scope || Selected.StartsWith(Scope + "/", StringComparison.Ordinal)))
+            if (!IsFloating(Selected) && visible == null && limited && !list.Any(n => n.Path == Selected) && (Scope.Length == 0 || Selected == Scope || Selected.StartsWith(Scope + "/", StringComparison.Ordinal)))
             {
                 foreach (var node in Current.AncestorsAndSelf().Reverse())
                 {
@@ -108,57 +120,53 @@ namespace BaroEditor
                 while (nodes.Any(other => !ReferenceEquals(node.Xml, other.Xml) && Math.Abs(Positions[other.Xml].X - point.X) < 250 && Math.Abs(Positions[other.Xml].Y - point.Y) < 130)) point.Y += 150;
             }
         }
-        public Dictionary<string, NodePosition> CapturePositions() => Positions.Where(p => ReferenceEquals(p.Key.Document, Document.Xml)).ToDictionary(p => Document.PathOf(p.Key), p => new NodePosition { X = p.Value.X, Y = p.Value.Y });
+        public Dictionary<string, NodePosition> CapturePositions() => Positions.Where(p => IsLive(p.Key)).ToDictionary(p => PathOf(p.Key), p => new NodePosition { X = p.Value.X, Y = p.Value.Y });
         private void Restore(Dictionary<string, NodePosition> points)
         {
-            Positions.Clear(); foreach (var point in points) { try { Positions[Document.Element(point.Key)] = new NodePosition { X = point.Value.X, Y = point.Value.Y }; } catch (InvalidDataException) { } }
+            Positions.Clear(); foreach (var point in points) { try { Positions[Element(point.Key)] = new NodePosition { X = point.Value.X, Y = point.Value.Y }; } catch (InvalidDataException) { } }
         }
         public void LayoutEdited(Dictionary<string, NodePosition> before)
         {
             var after = CapturePositions(); if (JsonSerializer.Serialize(before) == JsonSerializer.Serialize(after)) return;
-            undo.Add((false, before, after, Selected, Selected)); TrimHistory(); redo.Clear();
+            undo.Add(new Edit { Before=before, After=after, SelectionBefore=Selected, SelectionAfter=Selected, ScopeBefore=Scope, ScopeAfter=Scope }); TrimHistory(); redo.Clear();
         }
         private void TrimHistory() { while (undo.Count > 24) undo.RemoveAt(0); }
-        public void Change(Action<EventDocument> action)
-        {
-            var before = CapturePositions(); string oldSelection = Selected; XElement oldNode = Current; long revision = Document.Revision;
-            action(Document); if (revision == Document.Revision) return;
-            foreach (var orphan in Positions.Keys.Where(n => !ReferenceEquals(n.Document, Document.Xml)).ToArray()) Positions.Remove(orphan);
-            if (ReferenceEquals(oldNode.Document, Document.Xml)) Selected = Document.PathOf(oldNode);
-            else { try { Document.Element(Selected); } catch { Selected = Scope; } }
-            try { Document.Element(Scope); } catch { Scope = ""; }
-            EnsurePositions(Nodes("", out _));
-            undo.Add((true, before, CapturePositions(), oldSelection, Selected)); TrimHistory(); redo.Clear();
-        }
+        public void Change(Action<EventDocument> action) => ChangeIn(SelectedDocument, action);
         public void Undo()
         {
             if (!CanUndo) return; var edit = undo[^1];
-            if (edit.Xml) { if (!Document.CanUndo) throw new InvalidOperationException("这次 XML 修改超过历史预算，无法撤销。"); Document.Undo(); }
-            undo.RemoveAt(undo.Count - 1); redo.Add(edit); Restore(edit.Before); Selected = edit.SelectionBefore; ValidateSelection();
+            if (edit.Xml && !Document.CanUndo || edit.Draft && !draft.CanUndo) throw new InvalidOperationException("这次修改超过历史预算，无法撤销。");
+            if (edit.Xml) Document.Undo(); if (edit.Draft) draft.Undo();
+            undo.RemoveAt(undo.Count - 1); redo.Add(edit); Restore(edit.Before); Selected = edit.SelectionBefore; Scope=edit.ScopeBefore; ValidateSelection();
         }
         public void Redo()
         {
             if (!CanRedo) return; var edit = redo[^1];
-            if (edit.Xml) { if (!Document.CanRedo) return; Document.Redo(); }
-            redo.RemoveAt(redo.Count - 1); undo.Add(edit); Restore(edit.After); Selected = edit.SelectionAfter; ValidateSelection();
+            if (edit.Xml && !Document.CanRedo || edit.Draft && !draft.CanRedo) return;
+            if (edit.Xml) Document.Redo(); if (edit.Draft) draft.Redo();
+            redo.RemoveAt(redo.Count - 1); undo.Add(edit); Restore(edit.After); Selected = edit.SelectionAfter; Scope=edit.ScopeAfter; ValidateSelection();
         }
-        private void ValidateSelection() { try { Document.Element(Scope); } catch { Scope = ""; } try { Document.Element(Selected); } catch { Selected = Scope; } }
+        private void ValidateSelection() { try { Document.Element(Scope); } catch { Scope = ""; } try { Element(Selected); } catch { Selected = Scope; } }
         public string Add(string parent, string name, NodePosition position = null, IDictionary<string, string> attributes = null)
         {
             string added = null;
-            Change(doc => { var node = doc.Element(parent); int index = node.Elements().Count(); doc.AddChild(parent, name, attributes); added = parent.Length == 0 ? index.ToString() : parent + "/" + index; if (position != null) Positions[doc.Element(added)] = position; });
+            var editor = IsFloating(parent) ? draft : Document;
+            EventStructure.RequirePlacement(Element(parent),new[]{new XElement(name)});
+            ChangeIn(editor, doc => { var node = Element(parent); int index = node.Elements().Count(); doc.AddChild(doc.PathOf(node), name, attributes); added = parent.Length == 0 ? index.ToString() : parent + "/" + index; if (position != null) Positions[Element(added)] = position; });
             Select(added); EnsurePositions(Nodes("", out _)); FinalizeSelection(); return added;
         }
         public void FinalizeSelection()
         {
-            if (undo.Count == 0) return; var edit = undo[^1]; undo[^1] = (edit.Xml, edit.Before, CapturePositions(), edit.SelectionBefore, Selected);
+            if (undo.Count == 0) return; var edit = undo[^1]; edit.After=CapturePositions(); edit.SelectionAfter=Selected; edit.ScopeAfter=Scope;
         }
         public void Connect(string source, string target, string kind)
         {
+            if (IsFloating(source) || IsFloating(target)) { ConnectFloating(source,target,kind); return; }
             if (source == target) throw new InvalidOperationException("节点不能连接到自己。");
             var sourceNode = Document.Element(source); var targetNode = Document.Element(target);
+            EventStructure.RequirePlacement(kind=="next"?sourceNode.Parent??sourceNode:sourceNode,new[]{targetNode});
             if (sourceNode.Ancestors().Contains(targetNode)) throw new InvalidOperationException("连接会把祖先放进后代，形成循环，已取消。");
-            Change(doc =>
+            ChangeIn(Document, doc =>
             {
                 if (kind == "next")
                 {
@@ -172,9 +180,9 @@ namespace BaroEditor
             Select(Document.PathOf(targetNode));
             FinalizeSelection();
         }
-        public ProjectFile Snapshot() => new() { Xml = Document.Text, Scope = Scope, Selected = Selected, Positions = CapturePositions(), Localization = Localization.Snapshot() };
-        private string ProjectState() => JsonSerializer.Serialize(new ProjectFile { Xml = Document.Text, Scope = Scope, Selected = Selected, Positions = CapturePositions() });
-        public bool ProjectDirty => savedProject != null ? savedLocalizationRevision != Localization.Revision || savedProject != ProjectState() : Document.Dirty || undo.Count > 0 || Localization.Languages.Any();
+        public ProjectFile Snapshot() => new() { FormatVersion=HasFloating?2:1, Xml = Document.Text, Scope = Scope, Selected = Selected, Positions = CapturePositions(), Localization = Localization.Snapshot(), DraftXml=draft.Xml.Root.HasElements?draft.Text:null };
+        private string ProjectState() => JsonSerializer.Serialize(new ProjectFile { Xml = Document.Text, Scope = Scope, Selected = Selected, Positions = CapturePositions(), DraftXml=draft.Xml.Root.HasElements?draft.Text:null });
+        public bool ProjectDirty => savedProject != null ? savedLocalizationRevision != Localization.Revision || savedProject != ProjectState() : Document.Dirty || undo.Count > 0 || HasFloating || Localization.Languages.Any();
         public void SaveProject(string path)
         {
             string text = JsonSerializer.Serialize(Snapshot(), new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
@@ -185,12 +193,13 @@ namespace BaroEditor
         {
             if (new FileInfo(path).Length > 64 * 1024 * 1024) throw new InvalidDataException("工程超过 64 MiB。");
             var project = JsonSerializer.Deserialize<ProjectFile>(File.ReadAllText(path));
-            if (project?.FormatVersion != 1 || project.Positions == null || project.Positions.Count > EventDocument.MaxElements) throw new InvalidDataException("不支持的工程格式。");
+            if (project == null || project.FormatVersion is not (1 or 2) || project.Positions == null || project.Positions.Count > EventDocument.MaxElements) throw new InvalidDataException("不支持的工程格式。");
             if (project.Positions.Keys.Any(k => k.Length > 640) || (project.Scope?.Length ?? 0) > 640 || (project.Selected?.Length ?? 0) > 640) throw new InvalidDataException("工程路径长度无效。");
             var document = new EventDocument(project.Xml);
+            var importedDraft = ReadDraft(project.DraftXml);
             var importedLocalization = new Localization(); importedLocalization.Restore(project.Localization);
             foreach (var p in project.Positions.Values) if (!double.IsFinite(p.X) || !double.IsFinite(p.Y) || p.X < 0 || p.Y < 0 || p.X > 100000 || p.Y > 100000) throw new InvalidDataException("工程坐标无效。");
-            Load(document); Localization.Restore(importedLocalization.Snapshot()); Scope = project.Scope ?? ""; Selected = project.Selected ?? Scope; ValidateSelection(); Restore(project.Positions); savedProject = ProjectState(); savedLocalizationRevision = Localization.Revision;
+            Load(document); draft=importedDraft; Localization.Restore(importedLocalization.Snapshot()); Scope = project.Scope ?? ""; Selected = project.Selected ?? Scope; ValidateSelection(); Restore(project.Positions); savedProject = ProjectState(); savedLocalizationRevision = Localization.Revision;
         }
         private static void WriteProject(string path, string text)
         {

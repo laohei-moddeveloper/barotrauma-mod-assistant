@@ -6,7 +6,7 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>BaroEditor.Desktop</AssemblyName>
-    <Version>0.2.1</Version>
+    <Version>0.2.2</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets/app.ico</ApplicationIcon>
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>

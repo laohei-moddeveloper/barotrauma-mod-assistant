@@ -34,7 +34,7 @@ namespace BaroEditor.Desktop
         {
             if (Path.GetExtension(path).Equals(".baroeditor", StringComparison.OrdinalIgnoreCase)) { Model.ReadProject(path); projectPath = path; }
             else { Model.Load(EventDocument.Read(path)); projectPath = null; }
-            ResetView(); SetStatus("已载入 " + Path.GetFileName(path) + " · 原文件保留");
+            ResetView(); int issues=EventStructure.Violations(Model.Document.Xml.Root).Count(); SetStatus("已载入 " + Path.GetFileName(path) + " · 原文件保留" + (issues>0?" · 结构警告：有 "+issues+" 处事件组/脚本事件嵌套在事件内部，请修正":""),issues>0);
         }
         private void ResetView()
         {
@@ -48,11 +48,11 @@ namespace BaroEditor.Desktop
             if (projectPath != null) dialog.InitialDirectory = Path.GetDirectoryName(projectPath);
             if (dialog.ShowDialog(this) != true) return;
             if (!Path.GetExtension(dialog.FileName).Equals(".baroeditor", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("工程文件请使用 .baroeditor 扩展名；事件 XML 请用导出功能。");
-            ProtectPath(dialog.FileName); Model.SaveProject(dialog.FileName); projectPath = dialog.FileName; RefreshHeader(); SetStatus("工程已保存 · 可继续恢复布局和 XML 草稿");
+            ProtectPath(dialog.FileName); Model.SaveProject(dialog.FileName); projectPath = dialog.FileName; RefreshHeader(); SetStatus("工程已保存 · XML、布局、本地化" + (Model.HasFloating ? " · 已保留 " + Model.FloatingCount + " 组悬空草稿" : ""));
         }
         private void ExportXml()
         {
-            CommitInspector(); string directory = Path.Combine(Storage, "Exports"); Directory.CreateDirectory(directory);
+            CommitInspector(); if (!ConfirmConnectedOutput()) return; string directory = Path.Combine(Storage, "Exports"); Directory.CreateDirectory(directory);
             var dialog = new SaveFileDialog { Title = "导出 XML 副本", Filter = "事件 XML|*.xml", DefaultExt = ".xml", FileName = "event.xml", InitialDirectory = directory, OverwritePrompt = true };
             if (dialog.ShowDialog(this) != true) return; ProtectPath(dialog.FileName);
             if (Model.Document.SourcePath != null && Path.GetFullPath(dialog.FileName).Equals(Path.GetFullPath(Model.Document.SourcePath), StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("导出请选择新的文件名。覆盖原文件请使用高级操作。");
@@ -60,7 +60,7 @@ namespace BaroEditor.Desktop
         }
         private void CopyXml(bool full)
         {
-            CommitInspector(); XElement node = Model.Current;
+            CommitInspector(); if (!ConfirmConnectedOutput()) return; XElement node = Model.Current;
             if (!full) { node = node.AncestorsAndSelf().FirstOrDefault(e => e.Name.LocalName is "ScriptedEvent" or "TraitorEvent"); if (node == null) throw new InvalidOperationException("请先选择事件或事件内的节点。"); }
             Clipboard.SetText(EventDocument.PrettyXml(full ? (XNode)Model.Document.Xml : node)); SetStatus("XML 已复制 · 带换行与缩进"); RefreshHeader();
         }
@@ -71,7 +71,7 @@ namespace BaroEditor.Desktop
         }
         private void OverwriteSource()
         {
-            CommitInspector(); if (Model.Document.SourcePath == null) throw new InvalidOperationException("此草稿没有可覆盖的源文件；请导出副本。工程内草稿不会自动读取原文件。"); ProtectPath(Model.Document.SourcePath);
+            CommitInspector(); if (!ConfirmConnectedOutput()) return; if (Model.Document.SourcePath == null) throw new InvalidOperationException("此草稿没有可覆盖的源文件；请导出副本。工程内草稿不会自动读取原文件。"); ProtectPath(Model.Document.SourcePath);
             if (!Confirm("覆盖源文件：\n" + Model.Document.SourcePath + "\n\n将先备份原始字节，再检查外部修改。确认覆盖？")) return;
             Model.Document.OverwriteSource(Path.Combine(Storage, "Backups")); RefreshHeader(); SetStatus("源文件已保存 · 原始备份位于 " + Path.Combine(Storage, "Backups"));
         }
@@ -82,7 +82,7 @@ namespace BaroEditor.Desktop
         private void ShowTools()
         {
             var menu = new ContextMenu { Background = panel, Foreground = ink };
-            foreach (var (label, action) in new (string, Action)[] { ("粘贴导入 XML", ImportPasted), ("查找文件中的事件", FindEvent), ("编辑子树 XML", EditXml), ("高级：覆盖本地源文件", OverwriteSource), ("使用与交互说明", ShowHelp) })
+            foreach (var (label, action) in new (string, Action)[] { ("粘贴导入 XML", ImportPasted), ("查找文件中的事件", FindEvent), ("编辑子树 XML", EditXml), ("将选中动作移为悬空草稿", () => { CommitInspector(); Model.DetachSelected(); RefreshAll(); }), ("高级：覆盖本地源文件", OverwriteSource), ("使用与交互说明", ShowHelp) })
             { var item = new MenuItem { Header = label }; item.Click += (_, _) => Safe(action); menu.Items.Add(item); }
             menu.PlacementTarget = this; menu.IsOpen = true;
         }

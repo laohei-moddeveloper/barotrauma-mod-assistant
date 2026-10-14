@@ -142,7 +142,7 @@ namespace BaroEditor.Desktop
             var layout = Rows(Auto, Auto, Auto, Star, Auto); At(layout, Text("动作库", 16, ink, true)); actionSearch = Search("搜索中文名或 XML 动作名", _ => RefreshPalette(), "actions"); At(layout, actionSearch, 1);
             categories = new ComboBox { Margin = new Thickness(0, 0, 0, 12), MinHeight = 32, ItemsSource = new[] { "全部动作", "对话与界面", "条件与流程", "角色与行为", "物品与经济", "世界与事件", "分支与容器" }, SelectedIndex = 0 }; categories.SelectionChanged += (_, _) => RefreshPalette(); At(layout, categories, 2);
             palette = new StackPanel(); At(layout, new ScrollViewer { Content = palette, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }, 3);
-            At(layout, Text("拖入画布或节点添加\n点击添加到选中位置\n66 个原版动作 · 未知节点保留", 11, muted), 4); return Box(layout);
+            At(layout, Text("拖入画布或节点添加\n空白处添加悬空草稿\n66 个原版动作 · 未知节点保留", 11, muted), 4); return Box(layout);
         }
         private UIElement BuildCenter()
         {
@@ -226,7 +226,7 @@ namespace BaroEditor.Desktop
             foreach (var action in choices)
             {
                 var body = new StackPanel(); body.Children.Add(Text(action.Label, 13, ink, true)); body.Children.Add(Text(action.Name, 10, muted));
-                var button = Btn("", () => AddAction(action.Name, Model.Selected)); button.Content = body; button.HorizontalContentAlignment = HorizontalAlignment.Left; button.Margin = new Thickness(0, 0, 0, 7); button.ToolTip = "拖入节点添加；拖入空白画布按当前上下文添加";
+                var button = Btn("", () => AddAction(action.Name, Model.Selected)); button.Content = body; button.HorizontalContentAlignment = HorizontalAlignment.Left; button.Margin = new Thickness(0, 0, 0, 7); button.ToolTip = "拖入节点添加；拖入空白画布成为悬空草稿，连接后加入事件";
                 button.PreviewMouseLeftButtonDown += (_, e) => paletteDown = e.GetPosition(button);
                 button.PreviewMouseMove += (_, e) => { if (paletteDown is Point point && e.LeftButton == MouseButtonState.Pressed && (e.GetPosition(button) - point).Length > 5) { paletteDown = null; DragDrop.DoDragDrop(button, new DataObject("BaroEditor.Action", action.Name), DragDropEffects.Copy); } };
                 button.PreviewMouseLeftButtonUp += (_, _) => paletteDown = null; palette.Children.Add(button);

@@ -23,9 +23,9 @@ namespace BaroEditor.Desktop
             if (canvas == null) return;
             nodes = Model.Nodes(nodeSearch.Text, out bool limited);
             graphLimited = limited;
-            if (string.IsNullOrWhiteSpace(nodeSearch.Text) && Model.Document.Element(Model.Scope).Name.LocalName is "ScriptedEvent" or "TraitorEvent")
+            if (string.IsNullOrWhiteSpace(nodeSearch.Text) && Model.Element(Model.Scope).Name.LocalName is "ScriptedEvent" or "TraitorEvent")
             {
-                nodes = nodes.Where(n => n.Path != Model.Scope).ToArray(); foreach (var node in nodes) node.Depth = Math.Max(0, node.Depth - 1);
+                nodes = nodes.Where(n => n.Path != Model.Scope).ToArray(); foreach (var node in nodes.Where(n => !n.Floating)) node.Depth = Math.Max(0, node.Depth - 1);
             }
             Model.EnsurePositions(nodes);
             canvas.Children.Clear(); cards.Clear(); cardNodes.Clear(); edges.Clear();
@@ -40,7 +40,7 @@ namespace BaroEditor.Desktop
             }
             foreach (var group in nodes.Where(n => n.Xml.Parent != null && !Catalog.IsContainer(n.Name)).GroupBy(n => n.Xml.Parent))
             {
-                if (group.Key.Name.LocalName is not ("ScriptedEvent" or "TraitorEvent" or "Option" or "Success" or "Failure" or "Interrupt")) continue;
+                if (group.Key.Name.LocalName is not ("ScriptedEvent" or "TraitorEvent" or "Option" or "Success" or "Failure" or "Interrupt" or "BaroEditorDraftGroup")) continue;
                 var ordered = group.OrderBy(n => n.Xml.ElementsBeforeSelf().Count()).ToArray();
                 for (int i = 1; i < ordered.Length; i++)
                 {
@@ -50,7 +50,7 @@ namespace BaroEditor.Desktop
                 }
             }
             foreach (var node in nodes) MakeCard(node);
-            ResizeCanvas(); RefreshScript();
+            ResizeCanvas(); RefreshScript(); HighlightRelated(Model.Selected);
             if (limited) SetStatus("画布仅显示前 400 个节点；请搜索或选择单个事件。", true);
             else SetStatus(nodes.Count + " 个节点 · 拖动空白处平移 · 线上的 › 跳到下一节点 · 全图看全貌");
             if (nodes.Count == 0) { var empty = Text("没有匹配的节点\n清空搜索或更换事件", 18, muted); Canvas.SetLeft(empty, 40); Canvas.SetTop(empty, 60); canvas.Children.Add(empty); }
@@ -74,8 +74,10 @@ namespace BaroEditor.Desktop
         {
             edge.Curve.IsHitTestVisible = true; edge.Curve.Cursor = Cursors.Hand; edge.Curve.ToolTip = "点击跳到下一节点";
             edge.Curve.MouseLeftButtonDown += (_, e) => { Safe(() => FocusNode(edge.To.Path)); e.Handled = true; };
+            edge.Curve.MouseEnter += (_,_) => HighlightRelated(edge.From.Path,edge.To.Path); edge.Curve.MouseLeave += (_,_) => HighlightRelated(Model.Selected);
             edge.Jump = new Button { Content = "›", Width = 22, Height = 22, Padding = new Thickness(0), Margin = new Thickness(0), FontSize = 17, Background = soft, Foreground = accent, ToolTip = "跳到 " + EditorText.Node(edge.To.Name) + " · " + (edge.Sequence ? "下一同级动作" : "子节点 / 分支") };
             edge.Jump.Click += (_, e) => { Safe(() => FocusNode(edge.To.Path)); e.Handled = true; };
+            edge.Jump.MouseEnter += (_,_) => HighlightRelated(edge.From.Path,edge.To.Path); edge.Jump.MouseLeave += (_,_) => HighlightRelated(Model.Selected);
             Panel.SetZIndex(edge.Jump, 3); edges.Add(edge); canvas.Children.Add(edge.Curve); canvas.Children.Add(edge.Arrow); canvas.Children.Add(edge.Jump); UpdateEdge(edge);
         }
         private void PositionJump(Edge edge, Point a, Point c, Point d, Point b)
@@ -93,10 +95,14 @@ namespace BaroEditor.Desktop
         private void MakeCard(GraphNode node)
         {
             var panelBody = new Grid(); panelBody.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); panelBody.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); panelBody.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var headline = new DockPanel(); var number = Text(node.Xml.Parent == null ? "根" : (node.Xml.ElementsBeforeSelf().Count() + 1).ToString("00"), 10, muted); DockPanel.SetDock(number, Dock.Right); headline.Children.Add(number); headline.Children.Add(Text(EditorText.Node(node.Name), 14, node.Name is "ConversationAction" ? accent : node.Name is "Option" or "Success" or "Failure" ? amber : ink, true)); At(panelBody, headline);
-            var summary = Text(DisplaySummary(node).Length > 100 ? DisplaySummary(node)[..100] + "…" : DisplaySummary(node), 12, muted); summary.MaxHeight = 40; summary.TextTrimming = TextTrimming.CharacterEllipsis; summary.Margin = new Thickness(0, 6, 0, 5); At(panelBody, summary, 1); At(panelBody, Text(node.Name, 10, B("#6E8A9B")), 2);
+            var headline = new DockPanel(); var number = Text(node.Floating ? "悬空" : node.Xml.Parent == null ? "根" : (node.Xml.ElementsBeforeSelf().Count() + 1).ToString("00"), 10, muted); DockPanel.SetDock(number, Dock.Right); headline.Children.Add(number); headline.Children.Add(Text(EditorText.Node(node.Name), 14, node.Name is "ConversationAction" ? accent : node.Name is "Option" or "Success" or "Failure" ? amber : ink, true)); At(panelBody, headline);
+            var summary = Text(DisplaySummary(node).Length > 100 ? DisplaySummary(node)[..100] + "…" : DisplaySummary(node), 12, muted); summary.MaxHeight = 40; summary.TextTrimming = TextTrimming.CharacterEllipsis; summary.Margin = new Thickness(0, 6, 0, 5); At(panelBody, summary, 1);
+            if (ComparisonCondition.Applies(node.Xml)) At(panelBody, QuickComparison(node.Path,node.Xml), 2);
+            else if (node.Name == "GoTo") { var footer = new DockPanel(); var locate = Btn("↪ 定位目标", () => LocateGoTo(node.Path)); locate.Padding = new Thickness(5,3,5,3); locate.Margin = new Thickness(4,0,0,0); locate.FontSize = 10; DockPanel.SetDock(locate,Dock.Right); footer.Children.Add(locate); footer.Children.Add(Text(node.Name,10,muted)); At(panelBody,footer,2); }
+            else At(panelBody, Text(node.Name, 10, B("#6E8A9B")), 2);
             var card = new Border { Width = CardWidth, Height = CardHeight, Background = panel, BorderBrush = node.Path == Model.Selected ? accent : line, BorderThickness = new Thickness(node.Path == Model.Selected ? 2 : 1), CornerRadius = new CornerRadius(10), Padding = new Thickness(18, 12, 18, 10), Child = panelBody, Cursor = Cursors.SizeAll, AllowDrop = true, ToolTip = EditorText.DisplayNode(node.Name, true) + "\n" + node.Path + "\n拖动摆放；双击编辑文本或 XML" };
             var point = Model.Positions[node.Xml]; Canvas.SetLeft(card, point.X); Canvas.SetTop(card, point.Y); Panel.SetZIndex(card, 2); canvas.Children.Add(card); cards[node.Path] = card; cardNodes.Add((node, card));
+            if(node.Name is "GoTo" or "Label") { card.MouseEnter += (_,_) => HighlightRelated(node.Path); card.MouseLeave += (_,_) => HighlightRelated(Model.Selected); }
             var input = new Button { Content = "●", Padding = new Thickness(2), Width = 22, Height = 24, Background = bg, Foreground = accent, BorderThickness = new Thickness(0), Margin = new Thickness(-29, 0, 0, 0), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, ToolTip = "输入连接：先点击另一节点的输出圆点" };
             var output = new Button { Content = "●", Padding = new Thickness(2), Width = 22, Height = 24, Background = bg, Foreground = accent, BorderThickness = new Thickness(0), Margin = new Thickness(0, 0, -29, 0), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, ToolTip = "拖到另一节点的输入圆点连默认分支；点击可选其他分支" };
             panelBody.Children.Add(input); panelBody.Children.Add(output); Grid.SetRowSpan(input, 3); Grid.SetRowSpan(output, 3);
@@ -118,7 +124,7 @@ namespace BaroEditor.Desktop
             };
             card.MouseLeftButtonDown += (_, e) =>
             {
-                if (e.OriginalSource is FrameworkElement origin && FindAncestor<Button>(origin) != null) return;
+                if (e.OriginalSource is FrameworkElement origin && (FindAncestor<Button>(origin) != null || FindAncestor<TextBox>(origin) != null || FindAncestor<ComboBox>(origin) != null)) return;
                 Safe(() => SelectNode(node.Path));
                 if (e.ClickCount == 2) { Safe(EditNode); e.Handled = true; return; }
                 BeginDrag(node, e.GetPosition(canvas)); card.CaptureMouse(); e.Handled = true;
@@ -178,19 +184,20 @@ namespace BaroEditor.Desktop
         }
         private void CanvasDrop(object sender, DragEventArgs e)
         {
-            if (!e.Data.GetDataPresent("BaroEditor.Action")) return; Safe(() => AddAction((string)e.Data.GetData("BaroEditor.Action"), Model.Selected, e.GetPosition(canvas))); e.Handled = true;
+            if (!e.Data.GetDataPresent("BaroEditor.Action")) return; Safe(() => AddAction((string)e.Data.GetData("BaroEditor.Action"), Model.Selected, e.GetPosition(canvas), floating: true)); e.Handled = true;
         }
-        private void AddAction(string name, string target, Point? point = null)
+        private void AddAction(string name, string target, Point? point = null, bool floating = false)
         {
-            CommitInspector(); var node = Model.Document.Element(target);
-            string parent = Catalog.IsContainer(node.Name.LocalName) ? target : node.Parent != null ? Model.Document.PathOf(node.Parent) : target;
+            CommitInspector(); var node = Model.Element(target);
+            string parent = Catalog.IsContainer(node.Name.LocalName) ? target : node.Parent != null ? Model.PathOf(node.Parent) : target;
             var attributes = name == "ConversationAction" ? new Dictionary<string, string> { ["text"] = "在这里写台词", ["targettag"] = "player" } : name == "Option" ? new Dictionary<string, string> { ["text"] = "选项文本" } : null;
-            var added = Model.Add(parent, name, point is Point p ? new NodePosition { X = Math.Max(0, p.X), Y = Math.Max(0, p.Y) } : null, attributes);
-            RefreshAll(); SetStatus("已添加 " + EditorText.Node(name) + " · " + name);
+            var position = point is Point p ? new NodePosition { X = Math.Max(0, p.X), Y = Math.Max(0, p.Y) } : null;
+            var added = floating ? Model.AddFloating(name, position, attributes) : Model.Add(parent, name, position, attributes);
+            RefreshAll(); SetStatus(floating ? "已添加悬空草稿 · 不继承选中层级；连接后才加入事件 XML" : "已添加 " + EditorText.Node(name) + " · " + name);
         }
         private void SelectNode(string path)
         {
-            CommitInspector(); Model.Select(path); foreach (var card in cards) { card.Value.BorderBrush = card.Key == path ? accent : line; card.Value.BorderThickness = new Thickness(card.Key == path ? 2 : 1); } RefreshInspector(); if (inspectorMode == "xml") RefreshXml();
+            CommitInspector(); Model.Select(path); HighlightRelated(path); RefreshInspector(); if (inspectorMode == "xml") RefreshXml();
         }
         private void Arrange() { CommitInspector(); var before = Model.CapturePositions(); Model.Arrange(nodes); Model.LayoutEdited(before); RefreshAll(); }
         private void Fit()
@@ -212,14 +219,16 @@ namespace BaroEditor.Desktop
         {
             CommitInspector();
             if (scriptMode) SwitchMode(false);
-            if (!cards.ContainsKey(path)) { nodeSearch.Text = ""; Model.Select(path); RefreshGraph(); }
-            SelectNode(path); var node = Model.Document.Element(path);
+            if (!cards.ContainsKey(path)) { fields.Clear(); nodeSearch.Text = ""; Model.Select(path); RefreshGraph(); }
+            SelectNode(path); var node = Model.Element(path);
             if (!Model.Positions.TryGetValue(node, out var position)) return;
             SetZoom(1); CenterView(position.X + CardWidth / 2, position.Y + CardHeight / 2);
             SetStatus("已跳到 " + EditorText.Node(node.Name.LocalName) + " · 100% · “全图”返回概览");
         }
         private string DisplaySummary(GraphNode node)
         {
+            if (node.Name is "GoTo" or "Label") return "名称 " + EventDocument.Attribute(node.Xml,"name");
+            if (ComparisonCondition.Applies(node.Xml)) { ComparisonCondition.TrySplit(EventDocument.Attribute(node.Xml,"condition"),out string op,out string number); return EventDocument.Attribute(node.Xml,"identifier") + " · " + ComparisonCondition.Label(op) + " " + number; }
             string value = Model.Localization.Text(node.Xml); return value.Length > 0 ? value : node.Summary.Length > 0 ? node.Summary : NodeDescription(node.Xml);
         }
         private void RefreshHeader() { undo.IsEnabled = Model.CanUndo; redo.IsEnabled = Model.CanRedo; documentLabel.Text = (projectPath == null ? "事件草稿" : System.IO.Path.GetFileName(projectPath)) + " · " + (Model.ProjectDirty ? "有修改" : "已保存") + " · 原生 XML"; }
@@ -236,7 +245,7 @@ namespace BaroEditor.Desktop
                 row.Drop += (_, e) => Safe(() =>
                 {
                     CommitInspector();
-                    if (e.Data.GetDataPresent("BaroEditor.Node")) { string from = (string)e.Data.GetData("BaroEditor.Node"); var source = Model.Document.Element(from); if (!ReferenceEquals(source.Parent, node.Xml.Parent)) throw new InvalidOperationException("剧本卡片拖动排序需要同级节点；跨分支请用画布连线。"); Model.Change(doc => doc.Relocate(from, doc.PathOf(node.Xml.Parent), node.Xml.ElementsBeforeSelf().Count())); RefreshAll(); }
+                    if (e.Data.GetDataPresent("BaroEditor.Node")) { string from = (string)e.Data.GetData("BaroEditor.Node"); var source = Model.Element(from); if (!ReferenceEquals(source.Parent, node.Xml.Parent)) throw new InvalidOperationException("剧本卡片拖动排序需要同级节点；跨分支请用画布连线。"); Model.Select(from); Model.Change(doc => doc.Relocate(Model.SelectedLocalPath, doc.PathOf(node.Xml.Parent), node.Xml.ElementsBeforeSelf().Count())); RefreshAll(); }
                     else if (e.Data.GetDataPresent("BaroEditor.Action")) AddAction((string)e.Data.GetData("BaroEditor.Action"), node.Path);
                     e.Handled = true;
                 });

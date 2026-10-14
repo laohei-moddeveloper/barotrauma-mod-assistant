@@ -170,6 +170,7 @@ namespace BaroEditor
         {
             Change(() => { XElement node = Element(path); foreach (var pair in values) node.SetAttributeValue(XName.Get(pair.Key), pair.Value); });
         }
+        internal void EditTree(Action<XDocument> action) => Change(() => action(Xml));
         public void RemoveAttribute(string path, string name) => Change(() => Element(path).Attribute(XName.Get(name))?.Remove());
         public void Replace(string path, string xml)
         {
