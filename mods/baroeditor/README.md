@@ -2,7 +2,7 @@
 
 在潜渊症原版事件编辑器中，用 XML 树和属性面板编辑事件，减少手写层层嵌套的对话。输出仍是游戏原生 XML，不引入新的事件运行格式。
 
-**0.1.0 预览版：离线检查及游戏内基础界面、Action 元数据检查通过。复杂事件运行和完整节点图往返尚未充分验证。**
+**0.1.1 预览版：离线检查及游戏内基础界面、Action 元数据检查通过。复杂事件运行和完整节点图往返尚未充分验证。**
 
 ![BaroEditor 游戏内实际界面](publishing/cover.png)
 
@@ -17,6 +17,9 @@
 - 批量编辑连续对话，每行一句；保留已有选项、分支和动作。存在结构化 Text 替换时使用 XML 编辑；缩短现有对话链须明确删除节点。
 - 可将选中事件送入原版节点图；该图的导出能力取决于游戏，从图重新载入前会提示替换草稿。
 - 原版游戏 UI，中文与英文界面；不改变游玩时的对话外观。
+
+- 动作与属性显示中文，保留 XML 原名；事件、节点、台词、动作和属性支持中英文搜索。
+- 剪贴板 XML 带换行与缩进；搜索使用延迟过滤及修改版本缓存。
 
 ## 安装与打开
 
@@ -70,6 +73,6 @@ MIT License。Barotrauma 与 LuaCs 是各自作者的项目，本工具为独立
 
 BaroEditor adds an XML tree and property editor to Barotrauma's vanilla event editor. Import existing event XML, inspect and edit any node, discover native Actions, batch-edit simple dialogue chains, undo/redo, export a new file, or explicitly copy XML. The output remains native event XML.
 
-Version 0.1.0 is a preview: offline checks, basic in-game windows and native Action metadata passed. Complex event execution and complete vanilla graph round trips have not been fully validated. Complex Actions use generic attributes and subtree XML, rather than dedicated visual wizards. The vanilla graph exporter may omit content; the canonical XML draft is retained separately.
+Version 0.1.1 is a preview: offline checks, basic in-game windows and native Action metadata passed. Complex event execution and complete vanilla graph round trips have not been fully validated. Complex Actions use generic attributes and subtree XML, rather than dedicated visual wizards. The vanilla graph exporter may omit content; the canonical XML draft is retained separately.
 
 Requires the client-side LuaCs runtime with C# mod support. Enable LuaCs and BaroEditor, return to the main menu, press F3 and run `baroeditor`. Default export: `%LOCALAPPDATA%/BaroEditor/Exports`. Source overwrite is a separate confirmed operation with backup and change detection. There is no networking, telemetry, scanning, or execution of imported events. LuaCs C# plugins are trusted code; these access limits are application behavior, not an OS sandbox.

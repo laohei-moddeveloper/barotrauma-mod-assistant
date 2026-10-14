@@ -29,7 +29,14 @@ namespace BaroEditor
         private static GUIListBox inspector;
         private static GUITextBlock status;
         private static GUITextBlock selectedTitle;
-        private static GUIDropDown events;
+        private static GUIButton events;
+        private static string treeQuery = "", propertyQuery = "";
+        private static EventSearch searchIndex;
+        private static long searchRevision = -1, searchDue;
+        private static Action pendingSearch;
+        private static bool Chinese => T("中", "en") == "中";
+        private static string NodeName(string name) => EditorText.DisplayNode(name, Chinese);
+        private static string PropertyName(string name) => EditorText.DisplayProperty(name, Chinese);
         private static string selected = "";
         private static string scope = "";
         private static readonly HashSet<string> expanded = new();
@@ -48,10 +55,12 @@ namespace BaroEditor
             dialog?.Close();
             if (window != null) { ReleaseInput(window); window.RemoveFromGUIUpdateList(true); window.RectTransform.Parent = null; }
             window = null; tree = null; inspector = null; status = null; attributeBoxes.Clear(); treeButtons.Clear();
+            pendingSearch = null; searchIndex = null;
         }
         internal static void AddToGUIUpdateList()
         {
             if (window == null) return;
+            if (pendingSearch != null && DateTime.UtcNow.Ticks >= searchDue) { var apply = pendingSearch; pendingSearch = null; Try(apply); }
             if (window.Rect.Width != layoutWidth || window.Rect.Height != layoutHeight) layoutDirty = true;
             if (layoutDirty && dialog == null) { CommitAttributes(); BuildLayout(); }
             window.AddToGUIUpdateList();
@@ -87,6 +96,13 @@ namespace BaroEditor
             input.TextBlock.RectTransform.MaxSize = new Point(int.MaxValue, int.MaxValue);
             input.TextBlock.RectTransform.RelativeSize = Vector2.One;
             return input;
+        }
+        private static void QueueSearch(Action action) { pendingSearch = action; searchDue = DateTime.UtcNow.AddMilliseconds(180).Ticks; }
+        private static GUITextBox SearchInput(RectTransform rect, string initial, string hint, Action<string> changed)
+        {
+            var box = Input(rect, initial, limit: 256); box.ToolTip = hint;
+            box.OnTextChangedDelegate = (_, value) => { QueueSearch(() => changed(value)); return true; };
+            return box;
         }
         private static RectTransform R(float w, float h, RectTransform parent) => new(new Vector2(w, h), parent);
         private static void Label(RectTransform parent, string text, float height = 0.05f) =>
@@ -142,8 +158,10 @@ namespace BaroEditor
             int bodyY = 126, bodyH = h - 234, leftW = (int)((w - 16) * .34f), rightX = leftW + 16, rightW = w - rightX;
             var left = new GUIFrame(P(0, bodyY, leftW, bodyH, root), style: null, color: Panel);
             Text(left.RectTransform, 16, 10, leftW - 32, 27, T("事件结构", "Event structure"), true);
-            events = new GUIDropDown(P(12, 46, leftW - 24, 34, left.RectTransform), T("选择事件", "Select event"), elementCount: 8);
-            tree = new GUIListBox(P(12, 92, leftW - 24, bodyH - 202, left.RectTransform), style: null);
+            events = ActionButton(left.RectTransform, 12, 46, leftW - 24, 34, "", SelectEvent);
+            Text(left.RectTransform, 12, 90, 42, 34, T("搜索", "Find"), color: Muted);
+            SearchInput(P(58, 90, leftW - 70, 34, left.RectTransform), treeQuery, T("搜索节点、台词、标识符或标签；中英文均可", "Search nodes, dialogue, identifiers or tags in either language"), value => { CommitAttributes(); treeQuery = value; RefreshTree(); });
+            tree = new GUIListBox(P(12, 136, leftW - 24, bodyH - 246, left.RectTransform), style: null);
             int third = (leftW - 40) / 3, bottom = bodyH - 96;
             ActionButton(left.RectTransform, 12, bottom, third, 34, T("添加", "Add child"), AddNode);
             ActionButton(left.RectTransform, 20 + third, bottom, third, 34, T("复制", "Duplicate"), () => { CommitAttributes(); document.Duplicate(selected); RefreshEvents(); RefreshTree(); });
@@ -155,7 +173,9 @@ namespace BaroEditor
             selectedTitle = Text(right.RectTransform, 20, 12, rightW - 230, 32, "", true, Accent);
             Text(right.RectTransform, 20, 48, rightW - 40, 24, T("编辑当前节点；未填写的属性沿用游戏默认值", "Edit the selected node; omitted properties use game defaults"), color: Muted);
             batchButton = ActionButton(right.RectTransform, rightW - 194, 12, 174, 38, T("批量对话", "Batch dialogue"), BatchDialogue, true);
-            inspector = new GUIListBox(P(16, 88, rightW - 32, bodyH - 156, right.RectTransform), style: null);
+            Text(right.RectTransform, 16, 84, 64, 34, T("筛选属性", "Filter"), color: Muted);
+            SearchInput(P(84, 84, rightW - 100, 34, right.RectTransform), propertyQuery, T("搜索属性中文名、XML 名或当前值", "Search property labels, XML names or values"), value => { CommitAttributes(); propertyQuery = value; RefreshInspector(); });
+            inspector = new GUIListBox(P(16, 130, rightW - 32, bodyH - 198, right.RectTransform), style: null);
             int editW = (rightW - 56) / 3;
             ActionButton(right.RectTransform, 16, bodyH - 52, editW, 36, T("应用属性", "Apply attributes"), ApplyAttributes, true);
             ActionButton(right.RectTransform, 28 + editW, bodyH - 52, editW, 36, T("添加属性", "Add attribute"), AddAttribute);
@@ -170,18 +190,19 @@ namespace BaroEditor
             status = Text(root, 8, h - 25, w - 16, 25, T("就绪 · 选择节点开始编辑", "Ready · select a node to edit"), color: Muted);
             RefreshEvents(); RefreshTree(); RefreshHistory();
         }
-        private static void SetDocument(EventDocument next) { document = next; scope = selected = ""; expanded.Clear(); expanded.Add(""); RefreshEvents(); RefreshTree(); Report(T("已载入。原文件保留，默认导出副本。", "Loaded. Source retained; export creates a copy by default.")); }
-        private static void ResetSelection() { scope = selected = ""; expanded.Clear(); expanded.Add(""); RefreshEvents(); RefreshTree(); }
+        private static void SetDocument(EventDocument next) { document = next; searchIndex = null; scope = selected = ""; expanded.Clear(); expanded.Add(""); RefreshEvents(); RefreshTree(); Report(T("已载入。原文件保留，默认导出副本。", "Loaded. Source retained; export creates a copy by default.")); }
+        private static void ResetSelection() { try { document.Element(selected); } catch { selected = scope; } RefreshEvents(); RefreshTree(); }
         private static void RefreshEvents()
         {
-            events.OnSelected = null;
             try { document.Element(scope); } catch { scope = ""; }
-            events.ListBox.Content.ClearChildren();
-            events.AddItem(T("整份文件", "Full file"), "");
-            foreach (string path in document.EventPaths())
-                events.AddItem(EventDocument.Attribute(document.Element(path), "identifier") + " / " + document.Element(path).Name.LocalName, path);
-            events.SelectItem(scope);
-            events.OnSelected = (_, value) => { Try(() => { CommitAttributes(); scope = selected = (string)value; expanded.Add(scope); RefreshTree(); }); return true; };
+            events.Text = scope.Length == 0 ? T("整份文件 · 点击选择事件", "Full file · choose event") : EventDocument.Attribute(document.Element(scope), "identifier") + " / " + NodeName(document.Element(scope).Name.LocalName);
+        }
+        private static void SelectEvent()
+        {
+            CommitAttributes();
+            var choices = new List<PickItem> { new(T("整份文件", "Full file"), "full file 整份文件", "") };
+            foreach (var entry in document.EventEntries()) { var node = entry.Node; string id = EventDocument.Attribute(node, "identifier"); choices.Add(new(id + " / " + NodeName(node.Name.LocalName), id + " " + node.Name.LocalName + " " + EditorText.Node(node.Name.LocalName), entry.Path)); }
+            Pick(T("选择文件中的事件", "Choose an event in this file"), choices, value => { scope = selected = (string)value; expanded.Add(scope); RefreshEvents(); RefreshTree(); });
         }
         private static void RefreshTree()
         {
@@ -189,12 +210,21 @@ namespace BaroEditor
             try { document.Element(scope); } catch { scope = ""; }
             try { document.Element(selected); } catch { selected = scope; }
             tree.Content.ClearChildren(); treeButtons.Clear();
+            HashSet<string> matches = null;
+            if (!string.IsNullOrWhiteSpace(treeQuery))
+            {
+                if (searchIndex == null || searchRevision != document.Revision) { searchIndex = new EventSearch(document.Xml.Root); searchRevision = document.Revision; }
+                matches = searchIndex.Find(treeQuery, scope, out int count, out bool limited);
+                Report(T($"搜索：{count}{(limited ? "+" : "")} 个匹配；保留父级上下文", $"Search: {count}{(limited ? "+" : "")} matches; ancestor context retained"));
+            }
             var stack = new Stack<(XElement Node, string Path, int Depth)>();
             stack.Push((document.Element(scope), scope, 0));
             int visible = 0;
-            while (stack.Count > 0 && visible++ < 1200)
+            while (stack.Count > 0 && visible < 1200)
             {
                 var entry = stack.Pop();
+                if (matches != null && !matches.Contains(entry.Path)) continue;
+                visible++;
                 string id = EventDocument.Attribute(entry.Node, "identifier");
                 string text = EventDocument.Attribute(entry.Node, "text");
                 string summary = id.Length > 0 ? id : text;
@@ -208,17 +238,17 @@ namespace BaroEditor
                 row.RectTransform.MinSize = new Point(0, 60);
                 int indent = 10 + Math.Min(entry.Depth, 10) * GUI.IntScale(12);
                 int availableWidth = Math.Max(40, row.Rect.Width - indent - 44);
-                Text(row.RectTransform, indent + 26, 7, availableWidth, 22, entry.Node.Name.LocalName, color: entry.Node.Name.LocalName.Equals("ConversationAction", StringComparison.OrdinalIgnoreCase) ? Accent : Foreground);
+                Text(row.RectTransform, indent + 26, 7, availableWidth, 22, Chinese ? EditorText.Node(entry.Node.Name.LocalName) : entry.Node.Name.LocalName, color: entry.Node.Name.LocalName.Equals("ConversationAction", StringComparison.OrdinalIgnoreCase) ? Accent : Foreground);
                 Text(row.RectTransform, indent + 26, 30, availableWidth, 20, summary.Length > 0 ? summary : T("节点", "Node"), color: Muted);
                 if (entry.Node.HasElements)
                     ActionButton(row.RectTransform, indent, 12, 22, 28, expanded.Contains(path) ? "-" : "+", () => { CommitAttributes(); selected = path; if (!expanded.Add(path)) expanded.Remove(path); RefreshTree(); });
-                row.ToolTip = entry.Node.Name.LocalName + (text.Length > 0 ? "\n" + text : "");
+                row.ToolTip = NodeName(entry.Node.Name.LocalName) + (text.Length > 0 ? "\n" + text : "");
                 row.OnClicked = (_, _) => { Try(() => { CommitAttributes(); selected = path; RefreshInspector(); }); return true; };
                 treeButtons.Add((path, row));
-                if (expanded.Contains(path))
+                if (matches != null || expanded.Contains(path))
                 {
                     XElement[] children = entry.Node.Elements().ToArray();
-                    for (int i = children.Length - 1; i >= 0; i--) stack.Push((children[i], path.Length == 0 ? i.ToString() : path + "/" + i, entry.Depth + 1));
+                    for (int i = children.Length - 1; i >= 0; i--) { string childPath = path.Length == 0 ? i.ToString() : path + "/" + i; if (matches == null || matches.Contains(childPath)) stack.Push((children[i], childPath, entry.Depth + 1)); }
                 }
             }
             if (stack.Count > 0) Report(T("可见节点达到 1200 个；请折叠分支或选择单个事件。", "1,200 visible nodes reached; collapse branches or select one event."), true);
@@ -227,17 +257,19 @@ namespace BaroEditor
         private static void RefreshInspector()
         {
             XElement node = document.Element(selected);
-            selectedTitle.Text = node.Name.LocalName;
+            selectedTitle.Text = Chinese ? EditorText.Node(node.Name.LocalName) : node.Name.LocalName;
+            selectedTitle.ToolTip = node.Name.LocalName + " / " + selected;
             batchButton.Enabled = node.Name.LocalName.Equals("ConversationAction", StringComparison.OrdinalIgnoreCase);
-            batchButton.ToolTip = batchButton.Enabled ? T("每行一句，保留已有选项和动作", "One message per line; existing options and effects retained") : T("选择 ConversationAction 后可用", "Select a ConversationAction to enable");
+            batchButton.ToolTip = batchButton.Enabled ? T("每行一句，保留已有选项和动作", "One message per line; existing options and effects retained") : T("选择对话节点（ConversationAction）后可用", "Select a ConversationAction to enable");
             inspector.Content.ClearChildren(); attributeBoxes.Clear();
             foreach (XAttribute attribute in node.Attributes().Where(a => !a.IsNamespaceDeclaration))
             {
+                if (!EditorText.Matches(attribute.Name.LocalName + " " + EditorText.Property(attribute.Name.LocalName) + " " + attribute.Value, propertyQuery)) continue;
                 PropertyHint hint = ActionCatalog.Properties(node.Name.LocalName).FirstOrDefault(p => p.Name.Equals(attribute.Name.LocalName, StringComparison.OrdinalIgnoreCase));
                 bool longValue = attribute.Value.Length > 16000;
                 int height = attribute.Value.Length > 80 ? 124 : 88;
                 var row = new GUIFrame(new RectTransform(new Vector2(1, 0), inspector.Content.RectTransform) { MinSize = new Point(0, height) }, style: null, color: Card);
-                Text(row.RectTransform, 14, 8, row.Rect.Width - 160, 22, attribute.Name.LocalName);
+                Text(row.RectTransform, 14, 8, row.Rect.Width - 160, 22, PropertyName(attribute.Name.LocalName));
                 Text(row.RectTransform, row.Rect.Width - 144, 8, 130, 22, hint?.Type.Name ?? "XML", color: Muted);
                 var box = Input(P(12, 36, row.Rect.Width - 24, height - 48, row.RectTransform), longValue ? attribute.Value[..16000] : attribute.Value, true);
                 box.Readonly = longValue;
@@ -246,7 +278,7 @@ namespace BaroEditor
                 if (hint != null && !longValue) box.ToolTip = hint.Type.Name + " / " + T("原版属性", "Vanilla property");
             }
             var note = new GUITextBlock(new RectTransform(new Vector2(1, 0), inspector.Content.RectTransform) { MinSize = new Point(0, GUI.IntScale(68)) },
-                ActionCatalog.Actions.ContainsKey(node.Name.LocalName) ? T("原版 Action。未填写的属性沿用游戏默认值。", "Vanilla Action. Omitted properties retain game defaults.") :
+                ActionCatalog.Actions.ContainsKey(node.Name.LocalName) ? T("原版动作。未填写的属性沿用游戏默认值。", "Vanilla Action. Omitted properties retain game defaults.") :
                 T("XML 容器或扩展节点；属性、子节点与原文均保留。", "XML container or extension node; attributes, children and source are retained."), font: GUIStyle.SmallFont, wrap: true);
             foreach (var row in treeButtons) row.Button.Selected = row.Path == selected;
         }
@@ -270,7 +302,7 @@ namespace BaroEditor
             {
                 ReleaseInput(Overlay);
                 Overlay.RemoveFromGUIUpdateList(true); Overlay.RectTransform.Parent = null;
-                if (ReferenceEquals(dialog, this)) dialog = null;
+                if (ReferenceEquals(dialog, this)) { dialog = null; pendingSearch = null; }
             }
         }
         private static DialogView ShowDialog(string title, string message, LocalizedString[] buttons, Vector2? relativeSize = null, Point? minSize = null)
@@ -291,6 +323,45 @@ namespace BaroEditor
             view.Buttons = buttons.Select((caption, index) => ActionButton(frame.RectTransform, 24 + index * (buttonW + 12), h - 44, buttonW, 32, caption.Value, () => view.Close(), index == buttons.Length - 1)).ToArray();
             dialog = view;
             return view;
+        }
+        private sealed class PickItem
+        {
+            internal readonly string Caption, Search;
+            internal readonly object Value;
+            internal PickItem(string caption, string search, object value) { Caption = caption; Search = search; Value = value; }
+        }
+        private static void Pick(string title, IEnumerable<PickItem> options, Action<object> apply)
+        {
+            var choices = options.ToArray();
+            var box = ShowDialog(title, "", new LocalizedString[] { T("取消", "Cancel"), T("选择", "Select") }, relativeSize: new Vector2(.7f, .78f));
+            var body = box.Content.RectTransform;
+            Text(body, 0, 0, 50, 34, T("搜索", "Find"), color: Muted);
+            var list = new GUIListBox(P(0, 50, box.Content.Rect.Width, box.Content.Rect.Height - 80, body), style: null);
+            var count = Text(body, 0, box.Content.Rect.Height - 26, box.Content.Rect.Width, 26, "", color: Muted);
+            PickItem selectedItem = null;
+            var rows = new List<(PickItem Item, GUIButton Button)>();
+            void Filter(string query)
+            {
+                if (!ReferenceEquals(dialog, box)) return;
+                var filtered = choices.Where(item => EditorText.Matches(item.Search + " " + item.Caption, query)).ToArray();
+                var shown = filtered.Take(100).ToArray();
+                if (!shown.Contains(selectedItem)) selectedItem = shown.FirstOrDefault();
+                list.Content.ClearChildren(); rows.Clear();
+                foreach (var item in shown)
+                {
+                    var button = new GUIButton(new RectTransform(new Vector2(1, 0), list.Content.RectTransform) { MinSize = new Point(0, 40) }, item.Caption)
+                        { ForceUpperCase = ForceUpperCase.No, Color = Card, TextColor = Foreground, SelectedColor = new Color(40, 75, 73), SelectedTextColor = Foreground };
+                    button.ToolTip = item.Caption;
+                    button.OnClicked = (_, _) => { selectedItem = item; foreach (var row in rows) row.Button.Selected = ReferenceEquals(row.Item, item); return true; };
+                    rows.Add((item, button)); button.Selected = ReferenceEquals(item, selectedItem);
+                }
+                box.Buttons[1].Enabled = selectedItem != null;
+                count.Text = T($"{filtered.Length} 个结果{(filtered.Length > 100 ? " · 仅显示前 100 个，请细化搜索" : "")}", $"{filtered.Length} results{(filtered.Length > 100 ? " · first 100 shown; refine search" : "")}");
+            }
+            var search = SearchInput(P(54, 0, box.Content.Rect.Width - 54, 34, body), "", T("中文、XML 名称或标识符；空格分隔多个关键词", "Chinese, XML names or identifiers; separate keywords with spaces"), Filter);
+            box.Buttons[0].OnClicked = (_, _) => { box.Close(); return true; };
+            box.Buttons[1].OnClicked = (_, _) => { Try(() => { if (selectedItem == null) return; var item = selectedItem; box.Close(); apply(item.Value); }); return true; };
+            Filter(""); search.Select();
         }
         private static void Prompt(string title, string initial, Action<string> apply, bool multiline = false)
         {
@@ -317,12 +388,7 @@ namespace BaroEditor
         {
             var available = EventSet.GetAllEventPrefabs().Where(e => typeof(ScriptedEvent).IsAssignableFrom(e.EventType)).OrderBy(e => e.Identifier.Value).ToArray();
             if (available.Length == 0) throw new InvalidOperationException("No loaded scripted events found.");
-            var box = ShowDialog(T("载入游戏中已加载的事件", "Load an event currently loaded by the game"), "", new LocalizedString[] { T("取消", "Cancel"), T("载入", "Load") }, relativeSize: new Vector2(.6f, .5f));
-            var list = new GUIDropDown(R(1, .25f, box.Content.RectTransform), elementCount: 12);
-            foreach (var prefab in available) list.AddItem(prefab.Identifier.Value, prefab);
-            list.SelectItem(available[0]);
-            box.Buttons[0].OnClicked = (_, _) => { box.Close(); return true; };
-            box.Buttons[1].OnClicked = (_, _) => { Try(() => ConfirmDiscard(() => { var prefab = (EventPrefab)list.SelectedData; SetDocument(new EventDocument(prefab.ConfigElement.Element.ToString(SaveOptions.DisableFormatting))); box.Close(); })); return true; };
+            Pick(T("载入游戏中已加载的事件", "Load a game event"), available.Select(prefab => new PickItem(prefab.Identifier.Value, prefab.Identifier.Value, prefab)), value => ConfirmDiscard(() => SetDocument(new EventDocument(((EventPrefab)value).ConfigElement.Element.ToString(SaveOptions.DisableFormatting)))));
         }
         private static void ImportNative()
         {
@@ -333,28 +399,29 @@ namespace BaroEditor
         private static void AddNode()
         {
             CommitAttributes();
-            var box = ShowDialog(T("添加子节点 / 原版 Action 与分支", "Add child / vanilla Action or branch"), "", new LocalizedString[] { T("取消", "Cancel"), T("添加", "Add") }, relativeSize: new Vector2(.6f, .5f));
-            var list = new GUIDropDown(R(1, .27f, box.Content.RectTransform), elementCount: 12);
-            foreach (string name in new[] { "Option", "Success", "Failure", "Interrupt", "StatusEffect", "Conditional", "Text", "ScriptedEvent", "EventSet" }.Concat(ActionCatalog.Actions.Keys).Distinct().OrderBy(s => s)) list.AddItem(name, name);
-            list.SelectItem("ConversationAction");
-            box.Buttons[0].OnClicked = (_, _) => { box.Close(); return true; };
-            box.Buttons[1].OnClicked = (_, _) => { Try(() => { document.AddChild(selected, (string)list.SelectedData); expanded.Add(selected); RefreshEvents(); RefreshTree(); box.Close(); }); return true; };
+            var names = new[] { "Option", "Success", "Failure", "Interrupt", "StatusEffect", "Conditional", "Text", "ScriptedEvent", "EventSet" }.Concat(ActionCatalog.Actions.Keys).Distinct().OrderBy(s => s);
+            Pick(T("添加子节点 / 搜索原版动作与分支", "Add child / search Actions and branches"), names.Select(name => new PickItem(NodeName(name), name + " " + EditorText.Node(name), name)), value => { document.AddChild(selected, (string)value); expanded.Add(selected); RefreshEvents(); RefreshTree(); });
         }
         private static void AddAttribute()
         {
             CommitAttributes();
             var box = ShowDialog(T("添加或删除属性", "Add or remove an attribute"), "", new LocalizedString[] { T("取消", "Cancel"), T("添加 / 更新", "Add / update"), T("删除属性", "Remove attribute") }, relativeSize: new Vector2(.62f, .6f));
             var layout = new GUILayoutGroup(R(1, .85f, box.Content.RectTransform)) { RelativeSpacing = .02f };
-            var hints = new GUIDropDown(R(1, .2f, layout.RectTransform), T("原版属性提示", "Vanilla property hints"), elementCount: 10);
-            var name = Input(R(1, .2f, layout.RectTransform), "");
+            var search = SearchInput(R(1, .16f, layout.RectTransform), "", T("搜索原版属性：中英文均可", "Search native properties in either language"), _ => { });
+            var hints = new GUIDropDown(R(1, .18f, layout.RectTransform), T("搜索并选择原版属性", "Find a native property"), elementCount: 8);
+            Label(layout.RectTransform, T("XML 属性名（保持原文）", "XML attribute name"), .07f);
+            var name = Input(R(1, .16f, layout.RectTransform), "");
             var value = Input(R(1, .24f, layout.RectTransform), "", true);
-            foreach (PropertyHint hint in ActionCatalog.Properties(document.Element(selected).Name.LocalName)) hints.AddItem(hint.Name + " / " + hint.Type.Name, hint);
+            var candidates = ActionCatalog.Properties(document.Element(selected).Name.LocalName);
+            void FilterHints(string query) { if (!ReferenceEquals(dialog, box)) return; hints.ListBox.Content.ClearChildren(); foreach (var hint in candidates.Where(p => EditorText.Matches(p.Name + " " + EditorText.Property(p.Name), query))) hints.AddItem(PropertyName(hint.Name) + " / " + hint.Type.Name, hint); }
+            search.OnTextChangedDelegate = (_, query) => { QueueSearch(() => FilterHints(query)); return true; };
+            FilterHints("");
             hints.OnSelected = (_, item) => { var hint = (PropertyHint)item; name.Text = hint.Name; value.Text = hint.Default; return true; };
             box.Buttons[0].OnClicked = (_, _) => { box.Close(); return true; };
             box.Buttons[1].OnClicked = (_, _) => { Try(() => { document.SetAttributes(selected, new Dictionary<string, string> { [name.Text.Trim()] = value.Text }); RefreshTree(); box.Close(); }); return true; };
             box.Buttons[2].OnClicked = (_, _) => { Try(() => { document.RemoveAttribute(selected, name.Text.Trim()); RefreshTree(); box.Close(); }); return true; };
         }
-        private static void EditXml() { CommitAttributes(); Prompt(T("编辑选中子树 / 未识别内容保持原文", "Edit selected subtree / unknown content is retained"), document.Element(selected).ToString(SaveOptions.DisableFormatting), xml => { document.Replace(selected, xml); RefreshEvents(); RefreshTree(); }, true); }
+        private static void EditXml() { CommitAttributes(); Prompt(T("编辑选中子树 / 未识别内容保持原文", "Edit selected subtree / unknown content is retained"), EventDocument.PrettyXml(document.Element(selected)), xml => { document.Replace(selected, xml); RefreshEvents(); RefreshTree(); }, true); }
         private static void BatchDialogue()
         {
             CommitAttributes();
@@ -404,7 +471,7 @@ namespace BaroEditor
             ApplyAttributes();
             XElement current = CurrentEvent();
             if (!full && current == null) throw new InvalidOperationException("Select an event first.");
-            Clipboard.SetText(full ? document.Text : current.ToString(SaveOptions.DisableFormatting));
+            Clipboard.SetText(EventDocument.PrettyXml(full ? (XNode)document.Xml : current));
             Report(T("XML 已复制到剪贴板。", "XML copied to clipboard."));
         }
         private static void Overwrite()

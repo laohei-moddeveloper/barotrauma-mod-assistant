@@ -79,6 +79,43 @@ internal static class CoreTests
             for (int i = 1; i <= 40; i++) history.SetAttributes("", new Dictionary<string, string> { ["value"] = i.ToString() });
             int undoCount = 0; while (history.CanUndo) { history.Undo(); undoCount++; }
             Check(undoCount == 24 && history.Xml.Root.Attribute("value").Value == "16", "History has a bounded 24-edit limit");
+            var searchable = new EventDocument("<EventPrefabs><ScriptedEvent identifier='alpha'><Success><ConversationAction text='你好 captain' targettag='crew'/></Success></ScriptedEvent><ScriptedEvent identifier='beta'><WaitAction time='2'/></ScriptedEvent></EventPrefabs>");
+            string unchanged = searchable.Text;
+            var index = new EventSearch(searchable.Xml.Root);
+            var found = index.Find("对话 captain", "", out int matchCount, out bool truncated);
+            Check(matchCount == 1 && !truncated && found.SetEquals(new[] { "", "0", "0/0", "0/0/0" }), "Bilingual search retains ancestor context and AND keywords");
+            Check(index.Find("CONVERSATIONACTION 你好", "0", out matchCount, out truncated).Contains("0/0/0") && matchCount == 1, "XML name and dialogue search ignore English case");
+            Check(index.Find("说话者", "", out matchCount, out truncated).Count == 0, "No results are empty");
+            Check(index.Find("对话", "1", out matchCount, out truncated).Count == 0, "Search respects selected event scope");
+            Check(index.Find("", "", out matchCount, out truncated, 2).Count > 0 && matchCount == 2 && truncated, "Search result creation is bounded");
+            var siblings = new EventDocument("<a>" + string.Concat(Enumerable.Range(0, 11).Select(i => $"<b text='n{i}'/>")) + "</a>");
+            Check(new EventSearch(siblings.Xml.Root).Find("n10", "1", out matchCount, out truncated).Count == 0, "Scope 1 never includes sibling 10");
+            Check(searchable.Text == unchanged && !searchable.Dirty, "Searching never modifies XML");
+            var inline = new EventDocument("<Text>直接写在节点里的台词</Text>");
+            Check(new EventSearch(inline.Xml.Root).Find("节点里的台词", "", out matchCount, out truncated).Contains(""), "Search includes direct text nodes");
+            Check(wide.EventEntries().Count() == 10000 && ReferenceEquals(wide.EventEntries().First().Node, wide.Element("0")), "Event chooser uses direct node references in linear traversal");
+            searchable.SetAttributes("0", new Dictionary<string, string> { ["identifier"] = "alpha" });
+            Check(searchable.Revision == 0, "No-op edit keeps index revision");
+            searchable.SetAttributes("0/0/0", new Dictionary<string, string> { ["text"] = "再见" });
+            Check(searchable.Revision == 1 && new EventSearch(searchable.Xml.Root).Find("再见", "", out matchCount, out truncated).Count == 4, "Edit revision rebuilds searchable content");
+            searchable.Undo(); searchable.Redo(); Check(searchable.Revision == 3, "Undo and redo invalidate search caches");
+            var formatting = new EventDocument("<a>\n  <!--keep--><b text='one&#xA;two'/><mixed>before <i/> after</mixed><space xml:space='preserve'>  <i/> </space><data><![CDATA[  \n ]]><i/></data></a>");
+            string formatBefore = formatting.Text, pretty = EventDocument.PrettyXml(formatting.Xml);
+            var formatted = XDocument.Parse(pretty, LoadOptions.PreserveWhitespace);
+            Check(pretty.Contains("\n  <b") && pretty.Contains("<!--keep-->"), "Clipboard XML has line breaks, indentation and comments");
+            Check(formatted.Root.Element("b").Attribute("text").Value == "one\ntwo", "Dialogue line breaks survive formatted output");
+            foreach (string name in new[] { "mixed", "space", "data" }) Check(XNode.DeepEquals(formatting.Xml.Root.Element(name), formatted.Root.Element(name)), "Formatting preserves meaningful whitespace: " + name);
+            Check(formatting.Text == formatBefore && !formatting.Dirty, "Formatting never mutates the draft");
+            Check(EditorText.Node("UnknownFutureAction") == "UnknownFutureAction" && EditorText.Property("custom") == "custom", "Unknown extensions retain original labels");
+            if (args.Length > 2)
+            {
+                using var catalog = System.Text.Json.JsonDocument.Parse(File.ReadAllText(args[2]));
+                foreach (var action in catalog.RootElement.GetProperty("actions").EnumerateArray())
+                {
+                    string name = action.GetProperty("name").GetString(); Check(EditorText.Node(name) != name, "Native action translated: " + name);
+                    foreach (var prop in action.GetProperty("properties").EnumerateArray()) { string key = prop.GetString(); Check(EditorText.Property(key) != key, "Native property translated: " + key); }
+                }
+            }
             if (args.Length > 1)
             {
                 int files = 0, events = 0;

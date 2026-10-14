@@ -15,6 +15,11 @@ namespace BaroEditor
     {
         private Harmony harmony;
         private static int frame, stage;
+        private static object Field(string name) => typeof(Editor).GetField(name, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).GetValue(null);
+        private static void Invoke(string name) => typeof(Editor).GetMethod(name, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).Invoke(null, null);
+        private static GUIFrame DialogContent() { var current = Field("dialog"); return (GUIFrame)current.GetType().GetField("Content", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(current); }
+        private static GUIButton[] DialogButtons() { var current = Field("dialog"); return (GUIButton[])current.GetType().GetField("Buttons", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(current); }
+        private static void CloseDialog() => Field("dialog").GetType().GetMethod("Close", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).Invoke(Field("dialog"), null);
         private static string ResultPath => Path.Combine(Directory.GetCurrentDirectory(), "baroeditor-game-test.json");
         public void Initialize() { harmony = new Harmony("baroeditor.validation.only"); }
         public void PreInitPatching() { }
@@ -70,11 +75,31 @@ namespace BaroEditor
                 else if (stage == 2 && ++frame == 12)
                 {
                     Capture("baroeditor-native-batch.png");
+                    CloseDialog(); Invoke("AddNode");
+                    var input = DialogContent().GetAllChildren<GUITextBox>().Single(); input.Text = "对话"; ((GUITextBox.OnTextChangedHandler)typeof(GUITextBox).GetField("OnTextChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance).GetValue(input))(input, input.Text);
+                    stage = 4; frame = 0;
+                }
+                else if (stage == 4 && ++frame >= 30 && DateTime.UtcNow.Ticks >= (long)Field("searchDue") + TimeSpan.TicksPerMillisecond * 100)
+                {
+                    var rows = DialogContent().GetAllChildren<GUIListBox>().Single().Content.GetAllChildren<GUIButton>().ToArray();
+                    if (rows.Length != 1 || !rows[0].Text.ToString().Contains("ConversationAction") || !DialogButtons()[1].Enabled) throw new Exception("Localized picker search failed: " + string.Join(" | ", rows.Select(r => r.Text.ToString())) + " enabled=" + DialogButtons()[1].Enabled);
+                    Capture("baroeditor-native-search.png");
+                    var input = DialogContent().GetAllChildren<GUITextBox>().Single(); input.Text = "zz_no_action_zz"; ((GUITextBox.OnTextChangedHandler)typeof(GUITextBox).GetField("OnTextChanged", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance).GetValue(input))(input, input.Text);
+                    stage = 5; frame = 0;
+                }
+                else if (stage == 5 && ++frame >= 30 && DateTime.UtcNow.Ticks >= (long)Field("searchDue") + TimeSpan.TicksPerMillisecond * 100)
+                {
+                    if (DialogButtons()[1].Enabled || DialogContent().GetAllChildren<GUIListBox>().Single().Content.GetAllChildren<GUIButton>().Any()) throw new Exception("Empty picker results should disable selection.");
+                    CloseDialog();
+                    typeof(Editor).GetField("treeQuery", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).SetValue(null, "对话"); Invoke("RefreshTree");
+                    if (((GUIListBox)Field("tree")).Content.Children.Count() < 3) throw new Exception("Search ancestor context missing.");
+                    typeof(Editor).GetField("propertyQuery", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static).SetValue(null, "目标标签"); Invoke("RefreshInspector");
+                    if (((GUIListBox)Field("inspector")).Content.GetAllChildren<GUITextBox>().Count() != 1) throw new Exception("Localized property filtering failed.");
                     string[] expected = { "ConversationAction", "TagAction", "CheckMoneyAction", "WaitAction", "SpawnAction", "StatusEffectAction", "CheckConditionalAction" };
                     foreach (string name in expected) if (!ActionCatalog.Actions.ContainsKey(name)) throw new Exception("Missing action: " + name);
                     int properties = ActionCatalog.Actions.Keys.Sum(name => ActionCatalog.Properties(name).Length);
                     if (properties < 100 || !ActionCatalog.Properties("ConversationAction").Any(p => p.Name == "targettag")) throw new Exception("Serialized property hints missing.");
-                    File.WriteAllText(ResultPath, JsonSerializer.Serialize(new { success = true, version = GameMain.Version.ToString(), actions = ActionCatalog.Actions.Count, serializedProperties = properties, nativeGuiOpened = true, batchGuiOpened = true, runtimePatches = "editor GUI only", validationHarnessExcludedFromRelease = true }));
+                    File.WriteAllText(ResultPath, JsonSerializer.Serialize(new { success = true, version = GameMain.Version.ToString(), actions = ActionCatalog.Actions.Count, serializedProperties = properties, nativeGuiOpened = true, batchGuiOpened = true, localizedPickerSearch = true, emptyResultsDisabled = true, treeAncestorContext = true, localizedPropertySearch = true, runtimePatches = "editor GUI only", validationHarnessExcludedFromRelease = true }));
                     stage = 99; GameMain.Instance.Exit();
                 }
             }

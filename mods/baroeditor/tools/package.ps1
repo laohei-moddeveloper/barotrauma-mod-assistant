@@ -7,7 +7,7 @@ if (Test-Path -LiteralPath $bdOutput) { throw 'Use a new release directory; exis
 [IO.Directory]::CreateDirectory($bdOutput) | Out-Null
 $bdWorkshop = Join-Path $bdOutput 'workshop/BaroEditor'
 [IO.Directory]::CreateDirectory($bdWorkshop) | Out-Null
-$bdRuntimeFiles = @('CSharp/Shared/EventDocument.cs','CSharp/Client/Plugin.cs','CSharp/Client/Editor.cs','ModConfig.xml','filelist.xml','README.md','LICENSE','docs/ACCESS.md','publishing/cover.png')
+$bdRuntimeFiles = @('CSharp/Shared/EventDocument.cs','CSharp/Shared/EditorText.cs','CSharp/Shared/EventSearch.cs','CSharp/Client/Plugin.cs','CSharp/Client/Editor.cs','ModConfig.xml','filelist.xml','README.md','LICENSE','docs/ACCESS.md','publishing/cover.png')
 foreach ($bdRelative in $bdRuntimeFiles) {
     $bdTarget = Join-Path $bdWorkshop $bdRelative
     [IO.Directory]::CreateDirectory((Split-Path $bdTarget -Parent)) | Out-Null
@@ -23,11 +23,11 @@ foreach ($bdRelative in $bdSourceFiles) {
 }
 $bdActual = @(Get-ChildItem -LiteralPath $bdWorkshop -File -Recurse)
 if ($bdActual.Count -ne $bdRuntimeFiles.Count -or @($bdActual | Where-Object { $_.Extension -eq '.dll' -or $_.Name -eq 'GameValidation.cs' }).Count -gt 0) { throw 'Runtime allowlist validation failed.' }
-Compress-Archive -LiteralPath $bdWorkshop -DestinationPath (Join-Path $bdOutput 'BaroEditor-0.1.0.zip')
-Compress-Archive -LiteralPath $bdSource -DestinationPath (Join-Path $bdOutput 'BaroEditor-0.1.0-source.zip')
+Compress-Archive -LiteralPath $bdWorkshop -DestinationPath (Join-Path $bdOutput 'BaroEditor-0.1.1.zip')
+Compress-Archive -LiteralPath $bdSource -DestinationPath (Join-Path $bdOutput 'BaroEditor-0.1.1-source.zip')
 $bdManifest = foreach ($bdFile in $bdActual) {
     [pscustomobject]@{path=$bdFile.FullName.Substring($bdWorkshop.Length+1).Replace('\','/');bytes=$bdFile.Length;sha256=(Get-FileHash -LiteralPath $bdFile.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 }
 $bdArchives = @(Get-ChildItem -LiteralPath $bdOutput -Filter '*.zip' | ForEach-Object { [pscustomobject]@{name=$_.Name;bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()} })
-[pscustomobject]@{version='0.1.0';releaseChannel='preview';inGameAcceptance='basic-ui-and-metadata';runtime=$bdManifest;archives=$bdArchives} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $bdOutput 'manifest.json') -Encoding utf8
+[pscustomobject]@{version='0.1.1';releaseChannel='preview';inGameAcceptance='basic-ui-and-metadata';runtime=$bdManifest;archives=$bdArchives} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $bdOutput 'manifest.json') -Encoding utf8
 [pscustomobject]@{output=$bdOutput;runtimeFiles=$bdActual.Count;runtimeBytes=($bdActual | Measure-Object Length -Sum).Sum;archives=$bdArchives} | ConvertTo-Json -Depth 5

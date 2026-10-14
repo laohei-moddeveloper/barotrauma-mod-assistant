@@ -22,12 +22,26 @@ namespace BaroEditor
         private int historyBytes;
         private string savedXml;
         public XDocument Xml { get; private set; }
+        public long Revision { get; private set; }
         public string SourcePath { get; private set; }
         private string sourceHash;
         public bool CanUndo => undo.Count > 0;
         public bool CanRedo => redo.Count > 0;
         public bool Dirty => savedXml != Text;
         public string Text => Xml.ToString(SaveOptions.DisableFormatting);
+
+        public static string PrettyXml(XNode source)
+        {
+            XNode copy = source is XDocument doc ? new XDocument(doc) : new XElement((XElement)source);
+            var root = copy is XDocument document ? document.Root : (XElement)copy;
+            foreach (var element in root.DescendantsAndSelf())
+            {
+                string space = element.AncestorsAndSelf().Select(e => (string)e.Attribute(XNamespace.Xml + "space")).FirstOrDefault(s => s != null);
+                if (space == "preserve" || !element.HasElements || element.Nodes().OfType<XText>().Any(t => t is XCData || !string.IsNullOrWhiteSpace(t.Value))) continue;
+                foreach (var whitespace in element.Nodes().OfType<XText>().ToArray()) whitespace.Remove();
+            }
+            return copy.ToString();
+        }
 
         public EventDocument(string text) { Xml = Parse(text); savedXml = Text; }
         private EventDocument(XDocument xml) { Xml = xml; savedXml = Text; }
@@ -106,21 +120,20 @@ namespace BaroEditor
         }
         public static string Attribute(XElement element, string name) =>
             element.Attributes().FirstOrDefault(a => a.Name.LocalName.Equals(name, StringComparison.OrdinalIgnoreCase))?.Value ?? "";
-        public IReadOnlyList<string> EventPaths()
+        public IReadOnlyList<string> EventPaths() => EventEntries().Select(entry => entry.Path).ToArray();
+        public IEnumerable<(string Path, XElement Node)> EventEntries()
         {
-            var result = new List<string>();
             var stack = new Stack<(XElement Node, string Path)>();
             stack.Push((Xml.Root, ""));
             while (stack.Count > 0)
             {
                 var entry = stack.Pop();
                 if (entry.Node.HasElements && (entry.Node.Name.LocalName.Equals("ScriptedEvent", StringComparison.OrdinalIgnoreCase) ||
-                    entry.Node.Name.LocalName.Equals("TraitorEvent", StringComparison.OrdinalIgnoreCase))) result.Add(entry.Path);
+                    entry.Node.Name.LocalName.Equals("TraitorEvent", StringComparison.OrdinalIgnoreCase))) yield return (entry.Path, entry.Node);
                 var children = entry.Node.Elements().ToArray();
                 for (int i = children.Length - 1; i >= 0; i--)
                     stack.Push((children[i], entry.Path.Length == 0 ? i.ToString() : entry.Path + "/" + i));
             }
-            return result;
         }
         private void Change(Action action)
         {
@@ -132,6 +145,7 @@ namespace BaroEditor
                 string after = Text;
                 if (Encoding.UTF8.GetByteCount(after) > MaxBytes) throw new InvalidDataException("Edited XML exceeds 8 MiB.");
                 if (before == after) return;
+                Revision++;
                 foreach (Edit edit in redo) historyBytes -= Size(edit);
                 redo.Clear();
                 var current = new Edit { Before = before, After = after };
@@ -186,12 +200,12 @@ namespace BaroEditor
         public void Undo()
         {
             if (!CanUndo) return;
-            Edit edit = undo[^1]; undo.RemoveAt(undo.Count - 1); redo.Add(edit); Xml = Parse(edit.Before);
+            Edit edit = undo[^1]; undo.RemoveAt(undo.Count - 1); redo.Add(edit); Xml = Parse(edit.Before); Revision++;
         }
         public void Redo()
         {
             if (!CanRedo) return;
-            Edit edit = redo[^1]; redo.RemoveAt(redo.Count - 1); undo.Add(edit); Xml = Parse(edit.After);
+            Edit edit = redo[^1]; redo.RemoveAt(redo.Count - 1); undo.Add(edit); Xml = Parse(edit.After); Revision++;
         }
         public IReadOnlyList<string> ConversationLines(string path)
         {
