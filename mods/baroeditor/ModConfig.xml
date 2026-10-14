@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModConfig>
+  <Assembly Folder="%ModDir%/CSharp" IsScript="true" Target="Client" FriendlyName="BaroEditor.Client" />
+</ModConfig>

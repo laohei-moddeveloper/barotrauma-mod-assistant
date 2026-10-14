@@ -1,0 +1,23 @@
+BaroEditor|潜渊症通用事件编辑器
+
+[b]Edit native event XML with the vanilla interface.[/b]
+Import existing events, inspect the XML tree, edit Action attributes and subtrees, and batch-edit simple dialogue chains with one message per line.
+
+[b]Features[/b]
+Discovers native Actions from the current game. Supports generic attributes, subtree XML, adding/duplicating/moving/deleting nodes, and bounded undo/redo. Complex Actions use generic editing rather than dedicated visual wizards. Load events already available in game, or transfer an event to the vanilla node graph.
+
+[b]Output[/b]
+Default export creates a new XML file in %LOCALAPPDATA%/BaroEditor/Exports. Explicit buttons copy one event or the full XML. Local source overwrite is a separate confirmed operation with backup and external-change checks. Memory-loaded events have no writable source. Vanilla resources and Workshop caches are protected paths.
+
+[b]Requirements[/b]
+LuaCsForBarotrauma client runtime with C# mod support. Enable LuaCs and BaroEditor, return to the main menu, press F3 and run baroeditor. Client-side; no server installation required.
+
+[b]Performance and access[/b]
+Interaction-triggered XML processing, cached Action metadata and a collapsible tree. No networking, telemetry, directory scanning or execution of imported events. LuaCs C# plugins are trusted code in the game process, not OS-sandboxed applications. The package does not patch installed game binaries or enable global C# policy.
+
+[b]0.1.0 preview[/b]
+273 offline checks passed, alongside basic in-game windows and native metadata checks. Local game 1.13.4.0 exposes 66 concrete Actions and 313 serialized properties. The cover is an actual in-game screenshot. Complex event execution and full vanilla graph round trips have not been fully validated.
+
+[url=https://github.com/laohei-moddeveloper/baroeditor]Source, downloads and documentation on GitHub[/url]
+
+Independent community tool. MIT License.
