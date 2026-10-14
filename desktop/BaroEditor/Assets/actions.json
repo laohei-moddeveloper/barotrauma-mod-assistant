@@ -1,0 +1,2441 @@
+{
+  "gameVersion": "1.13.4.0",
+  "actions": [
+    {
+      "name": "AddScoreAction",
+      "properties": [
+        {
+          "name": "amount",
+          "type": "Int32",
+          "default": "1",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "team",
+          "type": "CharacterTeamType",
+          "default": "None",
+          "choices": [
+            "None",
+            "Team1",
+            "Team2",
+            "FriendlyNPC"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AfflictionAction",
+      "properties": [
+        {
+          "name": "affliction",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "limbtype",
+          "type": "LimbType",
+          "default": "None",
+          "choices": [
+            "None",
+            "LeftHand",
+            "RightHand",
+            "LeftArm",
+            "RightArm",
+            "LeftForearm",
+            "RightForearm",
+            "LeftLeg",
+            "RightLeg",
+            "LeftFoot",
+            "RightFoot",
+            "Head",
+            "Torso",
+            "Tail",
+            "Legs",
+            "RightThigh",
+            "LeftThigh",
+            "Waist",
+            "Jaw"
+          ]
+        },
+        {
+          "name": "multiplybymaxvitality",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "strength",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckAfflictionAction",
+      "properties": [
+        {
+          "name": "allowlimbafflictions",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "identifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "minstrength",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "sourcecharacter",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targetlimb",
+          "type": "LimbType",
+          "default": "None",
+          "choices": [
+            "None",
+            "LeftHand",
+            "RightHand",
+            "LeftArm",
+            "RightArm",
+            "LeftForearm",
+            "RightForearm",
+            "LeftLeg",
+            "RightLeg",
+            "LeftFoot",
+            "RightFoot",
+            "Head",
+            "Torso",
+            "Tail",
+            "Legs",
+            "RightThigh",
+            "LeftThigh",
+            "Waist",
+            "Jaw"
+          ]
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckConditionalAction",
+      "properties": [
+        {
+          "name": "applytagtohull",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "applytagtolinkedhulls",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "applytagtotarget",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "failiftargetnotfound",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "logicaloperator",
+          "type": "LogicalOperatorType",
+          "default": "Or",
+          "choices": [
+            "And",
+            "Or"
+          ]
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckConnectionAction",
+      "properties": [
+        {
+          "name": "connecteditemtag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "connectionname",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "itemtag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "minamount",
+          "type": "Int32",
+          "default": "1",
+          "choices": []
+        },
+        {
+          "name": "otherconnectionname",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckDataAction",
+      "properties": [
+        {
+          "name": "checkagainstmetadata",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "condition",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "forcestring",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "identifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckDifficultyAction",
+      "properties": [
+        {
+          "name": "maxdifficulty",
+          "type": "Single",
+          "default": "100",
+          "choices": []
+        },
+        {
+          "name": "mindifficulty",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckItemAction",
+      "properties": [
+        {
+          "name": "amount",
+          "type": "Int32",
+          "default": "1",
+          "choices": []
+        },
+        {
+          "name": "applytagtoitem",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "applytagtotarget",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "comparetoinitialamount",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "hulltag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "itemcontainerindex",
+          "type": "Int32",
+          "default": "-1",
+          "choices": []
+        },
+        {
+          "name": "itemidentifiers",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "itemtags",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "recursive",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "requiredconditionalmatchpercentage",
+          "type": "Single",
+          "default": "100",
+          "choices": []
+        },
+        {
+          "name": "requireequipped",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "requireworn",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckMissionAction",
+      "properties": [
+        {
+          "name": "missioncount",
+          "type": "Int32",
+          "default": "1",
+          "choices": []
+        },
+        {
+          "name": "missionidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "missiontag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "type",
+          "type": "MissionType",
+          "default": "Current",
+          "choices": [
+            "Current",
+            "Selected",
+            "Available"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CheckMoneyAction",
+      "properties": [
+        {
+          "name": "amount",
+          "type": "Int32",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckObjectiveAction",
+      "properties": [
+        {
+          "name": "identifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "type",
+          "type": "CheckType",
+          "default": "Completed",
+          "choices": [
+            "Added",
+            "Completed",
+            "Incomplete"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CheckOrderAction",
+      "properties": [
+        {
+          "name": "orderidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "orderoption",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "ordertargettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "priority",
+          "type": "OrderPriority",
+          "default": "Any",
+          "choices": [
+            "Top",
+            "Any"
+          ]
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckPurchasedItemsAction",
+      "properties": [
+        {
+          "name": "itemidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "itemtag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "mincount",
+          "type": "Int32",
+          "default": "1",
+          "choices": []
+        },
+        {
+          "name": "type",
+          "type": "TransactionType",
+          "default": "Purchased",
+          "choices": [
+            "Purchased",
+            "Sold"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CheckReputationAction",
+      "properties": [
+        {
+          "name": "checkagainstmetadata",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "condition",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "forcestring",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "identifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettype",
+          "type": "ReputationType",
+          "default": "None",
+          "choices": [
+            "None",
+            "Location",
+            "Faction"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CheckSelectedAction",
+      "properties": [
+        {
+          "name": "charactertag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "itemtype",
+          "type": "SelectedItemType",
+          "default": "Any",
+          "choices": [
+            "Primary",
+            "Secondary",
+            "Any"
+          ]
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckTalentAction",
+      "properties": [
+        {
+          "name": "talentidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckTraitorEventStateAction",
+      "properties": [
+        {
+          "name": "state",
+          "type": "State",
+          "default": "Completed",
+          "choices": [
+            "Incomplete",
+            "Completed",
+            "Failed"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CheckTraitorVoteAction",
+      "properties": [
+        {
+          "name": "target",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CheckVisibilityAction",
+      "properties": [
+        {
+          "name": "allowsameentity",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "applytagtoentity",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "applytagtotarget",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "checkfacing",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "entitytag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "excludedentitytag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "maxdistance",
+          "type": "Single",
+          "default": "1000",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "ClearTagAction",
+      "properties": [
+        {
+          "name": "tag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CombatAction",
+      "properties": [
+        {
+          "name": "abandononreset",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "combatmode",
+          "type": "CombatMode",
+          "default": "Offensive",
+          "choices": [
+            "Defensive",
+            "Offensive",
+            "Arrest",
+            "Retreat",
+            "None"
+          ]
+        },
+        {
+          "name": "cooldown",
+          "type": "Single",
+          "default": "120",
+          "choices": []
+        },
+        {
+          "name": "enemytag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "guardreaction",
+          "type": "CombatMode",
+          "default": "None",
+          "choices": [
+            "Defensive",
+            "Offensive",
+            "Arrest",
+            "Retreat",
+            "None"
+          ]
+        },
+        {
+          "name": "isinstigator",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "npctag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "witnessreaction",
+          "type": "CombatMode",
+          "default": "None",
+          "choices": [
+            "Defensive",
+            "Offensive",
+            "Arrest",
+            "Retreat",
+            "None"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ConversationAction",
+      "properties": [
+        {
+          "name": "continueautomatically",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "continueconversation",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "dialogtype",
+          "type": "DialogTypes",
+          "default": "Regular",
+          "choices": [
+            "Regular",
+            "Small",
+            "Mission"
+          ]
+        },
+        {
+          "name": "endeventifinterrupted",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "eventsprite",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "fadetoblack",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "forcesay",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "forcesayinradio",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "forcesayremovequotes",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "forcesaytext",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "ignoreinterruptdistance",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "invokertag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "speakertag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "text",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "waitforinteraction",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "CountTargetsAction",
+      "properties": [
+        {
+          "name": "comparetotarget",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "hulltag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "maxamount",
+          "type": "Int32",
+          "default": "-1",
+          "choices": []
+        },
+        {
+          "name": "maxpercentagerelativetotarget",
+          "type": "Single",
+          "default": "-1",
+          "choices": []
+        },
+        {
+          "name": "minamount",
+          "type": "Int32",
+          "default": "-1",
+          "choices": []
+        },
+        {
+          "name": "minpercentagerelativetotarget",
+          "type": "Single",
+          "default": "-1",
+          "choices": []
+        },
+        {
+          "name": "secondrequiredtargettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "DamageBeaconStationAction",
+      "properties": [
+        {
+          "name": "damagedeviceprobability",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "damagewallprobability",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "disconnectwireprobability",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "EventLogAction",
+      "properties": [
+        {
+          "name": "id",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "text",
+          "type": "String",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "EventObjectiveAction",
+      "properties": [
+        {
+          "name": "autoplayvideo",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "canbecompleted",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "height",
+          "type": "Int32",
+          "default": "80",
+          "choices": []
+        },
+        {
+          "name": "identifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "objectivetag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "parentobjectiveid",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "texttag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "type",
+          "type": "SegmentActionType",
+          "default": "Add",
+          "choices": [
+            "Trigger",
+            "Add",
+            "AddIfNotFound",
+            "Complete",
+            "CompleteAndRemove",
+            "Remove",
+            "Fail",
+            "FailAndRemove"
+          ]
+        },
+        {
+          "name": "videofile",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "width",
+          "type": "Int32",
+          "default": "450",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "FireAction",
+      "properties": [
+        {
+          "name": "size",
+          "type": "Single",
+          "default": "10",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "ForceSayAction",
+      "properties": [
+        {
+          "name": "message",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "removequotes",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "sayinradio",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "GiveExpAction",
+      "properties": [
+        {
+          "name": "amount",
+          "type": "Int32",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "GiveSkillExpAction",
+      "properties": [
+        {
+          "name": "amount",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "skill",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "GodModeAction",
+      "properties": [
+        {
+          "name": "enabled",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "updateafflictions",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "GoTo",
+      "properties": [
+        {
+          "name": "endconversation",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "maxtimes",
+          "type": "Int32",
+          "default": "-1",
+          "choices": []
+        },
+        {
+          "name": "name",
+          "type": "String",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "HighlightAction",
+      "properties": [
+        {
+          "name": "state",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "targetcharacter",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "InventoryHighlightAction",
+      "properties": [
+        {
+          "name": "itemcontainerindex",
+          "type": "Int32",
+          "default": "-1",
+          "choices": []
+        },
+        {
+          "name": "itemidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "recursive",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "Label",
+      "properties": [
+        {
+          "name": "name",
+          "type": "String",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "LayerAction",
+      "properties": [
+        {
+          "name": "continueifnotfound",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "enabled",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "layer",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "submarinetype",
+          "type": "SubType",
+          "default": "Any",
+          "choices": [
+            "Any",
+            "Player",
+            "Outpost",
+            "Wreck",
+            "BeaconStation",
+            "Enemy",
+            "Ruin"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MessageBoxAction",
+      "properties": [
+        {
+          "name": "closeonequiptag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "closeonexitroomname",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "closeoninput",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "closeoninroomname",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "closeonpickuptag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "closeonselecttag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "header",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "hideclosebutton",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "iconstyle",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "identifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "objectivecanbecompleted",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "objectivetag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "parentobjectiveid",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "tag",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "text",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "type",
+          "type": "ActionType",
+          "default": "Create",
+          "choices": [
+            "Create",
+            "ConnectObjective",
+            "Close",
+            "Clear"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MissionAction",
+      "properties": [
+        {
+          "name": "createlocationifnotfound",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "minlocationdistance",
+          "type": "Int32",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "missionidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "missiontag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "requiredfaction",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "unlockfurtheronmap",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "MissionStateAction",
+      "properties": [
+        {
+          "name": "forcefailure",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "missionidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "operation",
+          "type": "OperationType",
+          "default": "Set",
+          "choices": [
+            "Set",
+            "Add"
+          ]
+        },
+        {
+          "name": "state",
+          "type": "Int32",
+          "default": "0",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "ModifyLocationAction",
+      "properties": [
+        {
+          "name": "faction",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "name",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "secondaryfaction",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "type",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "MoneyAction",
+      "properties": [
+        {
+          "name": "amount",
+          "type": "Int32",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "NPCChangeTeamAction",
+      "properties": [
+        {
+          "name": "addtocrew",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "npctag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "removefromcrew",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "teamid",
+          "type": "CharacterTeamType",
+          "default": "None",
+          "choices": [
+            "None",
+            "Team1",
+            "Team2",
+            "FriendlyNPC"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "NPCFollowAction",
+      "properties": [
+        {
+          "name": "abandononreset",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "follow",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "forcewalk",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "maxtargets",
+          "type": "Int32",
+          "default": "-1",
+          "choices": []
+        },
+        {
+          "name": "npctag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "priority",
+          "type": "Single",
+          "default": "100",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "NPCOperateItemAction",
+      "properties": [
+        {
+          "name": "abandononreset",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "itemcomponentname",
+          "type": "Identifier",
+          "default": "Controller",
+          "choices": []
+        },
+        {
+          "name": "maxtargets",
+          "type": "Int32",
+          "default": "-1",
+          "choices": []
+        },
+        {
+          "name": "npctag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "operate",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "orderoption",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "priority",
+          "type": "Single",
+          "default": "100",
+          "choices": []
+        },
+        {
+          "name": "requireequip",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "NPCWaitAction",
+      "properties": [
+        {
+          "name": "abandononreset",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "npctag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "priority",
+          "type": "Single",
+          "default": "100",
+          "choices": []
+        },
+        {
+          "name": "wait",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "OnRoundEndAction",
+      "properties": []
+    },
+    {
+      "name": "RemoveItemAction",
+      "properties": [
+        {
+          "name": "amount",
+          "type": "Int32",
+          "default": "1",
+          "choices": []
+        },
+        {
+          "name": "itemidentifiers",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "ReputationAction",
+      "properties": [
+        {
+          "name": "identifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "increase",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "targettype",
+          "type": "ReputationType",
+          "default": "None",
+          "choices": [
+            "None",
+            "Location",
+            "Faction"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RNGAction",
+      "properties": [
+        {
+          "name": "chance",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "SetDataAction",
+      "properties": [
+        {
+          "name": "identifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "operation",
+          "type": "OperationType",
+          "default": "Set",
+          "choices": [
+            "Set",
+            "Multiply",
+            "Add"
+          ]
+        },
+        {
+          "name": "value",
+          "type": "String",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "SetPriceMultiplierAction",
+      "properties": [
+        {
+          "name": "multiplier",
+          "type": "Single",
+          "default": "1",
+          "choices": []
+        },
+        {
+          "name": "operation",
+          "type": "OperationType",
+          "default": "Set",
+          "choices": [
+            "Set",
+            "Multiply",
+            "Min",
+            "Max"
+          ]
+        },
+        {
+          "name": "targetmultiplier",
+          "type": "PriceMultiplierType",
+          "default": "Store",
+          "choices": [
+            "Store",
+            "Mechanical"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SetTraitorEventStateAction",
+      "properties": [
+        {
+          "name": "state",
+          "type": "State",
+          "default": "Completed",
+          "choices": [
+            "Incomplete",
+            "Completed",
+            "Failed"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SkillCheckAction",
+      "properties": [
+        {
+          "name": "probabilitybased",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "requiredlevel",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "requiredskill",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "SpawnAction",
+      "properties": [
+        {
+          "name": "allowduplicates",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "allowinplayerview",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "amount",
+          "type": "Int32",
+          "default": "1",
+          "choices": []
+        },
+        {
+          "name": "continueiffailedtospawn",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "ignorebyai",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "itemidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "itemtag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "lootingisstealing",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "npcidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "npcsetidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "offset",
+          "type": "Single",
+          "default": "100",
+          "choices": []
+        },
+        {
+          "name": "requirespawnpointtag",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "spawnifinventoryfull",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "spawnlocation",
+          "type": "SpawnLocationType",
+          "default": "Any",
+          "choices": [
+            "Any",
+            "MainSub",
+            "Outpost",
+            "MainPath",
+            "Cave",
+            "AbyssCave",
+            "Ruin",
+            "Wreck",
+            "BeaconStation",
+            "NearMainSub"
+          ]
+        },
+        {
+          "name": "spawnpointtag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "spawnpointtype",
+          "type": "SpawnType",
+          "default": "Human",
+          "choices": [
+            "Path",
+            "Human",
+            "Enemy",
+            "Cargo",
+            "Corpse",
+            "Submarine",
+            "ExitPoint",
+            "Disabled"
+          ]
+        },
+        {
+          "name": "speciesname",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targetinventory",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targetmoduletags",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "teamid",
+          "type": "CharacterTeamType",
+          "default": "FriendlyNPC",
+          "choices": [
+            "None",
+            "Team1",
+            "Team2",
+            "FriendlyNPC"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "StatusEffectAction",
+      "properties": [
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "TagAction",
+      "properties": [
+        {
+          "name": "allowhiddenitems",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "choosepercentage",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "chooserandom",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "chooserandomexcludingtag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "continueifnotargetsfound",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "criteria",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "ignoreincapacitatedcharacters",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "requiredmoduletag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "submarinetype",
+          "type": "SubType",
+          "default": "Any",
+          "choices": [
+            "Any",
+            "Player",
+            "Outpost",
+            "Wreck",
+            "BeaconStation",
+            "Enemy",
+            "Ruin"
+          ]
+        },
+        {
+          "name": "tag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "team",
+          "type": "CharacterTeam",
+          "default": "Any",
+          "choices": [
+            "Any",
+            "None",
+            "Team1",
+            "Team2",
+            "FriendlyNPC"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TeleportAction",
+      "properties": [
+        {
+          "name": "position",
+          "type": "TeleportPosition",
+          "default": "MainSub",
+          "choices": [
+            "MainSub",
+            "Outpost"
+          ]
+        },
+        {
+          "name": "spawnpointtag",
+          "type": "String",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "spawntype",
+          "type": "SpawnType",
+          "default": "Human",
+          "choices": [
+            "Path",
+            "Human",
+            "Enemy",
+            "Cargo",
+            "Corpse",
+            "Submarine",
+            "ExitPoint",
+            "Disabled"
+          ]
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "TriggerAction",
+      "properties": [
+        {
+          "name": "allowmultipletargets",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "applytotarget1",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "applytotarget2",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "checkalltargets",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "disableiftargetincapacitated",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "disableincombat",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "radius",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        },
+        {
+          "name": "selectontrigger",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "target1tag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "target2tag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targetmoduletype",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "type",
+          "type": "TriggerType",
+          "default": "Inside",
+          "choices": [
+            "Inside",
+            "Outside"
+          ]
+        },
+        {
+          "name": "waitforinteraction",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "TriggerEventAction",
+      "properties": [
+        {
+          "name": "eventtag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "identifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "nextround",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "TutorialCompleteAction",
+      "properties": []
+    },
+    {
+      "name": "TutorialIconAction",
+      "properties": [
+        {
+          "name": "iconstyle",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "targettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "type",
+          "type": "ActionType",
+          "default": "Add",
+          "choices": [
+            "Add",
+            "Remove",
+            "RemoveTarget",
+            "RemoveIcon",
+            "Clear"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "UIHighlightAction",
+      "properties": [
+        {
+          "name": "bounce",
+          "type": "Boolean",
+          "default": "true",
+          "choices": []
+        },
+        {
+          "name": "entityidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "highlightmultiple",
+          "type": "Boolean",
+          "default": "false",
+          "choices": []
+        },
+        {
+          "name": "id",
+          "type": "ElementId",
+          "default": "None",
+          "choices": [
+            "None",
+            "RepairButton",
+            "PumpSpeedSlider",
+            "PassiveSonarIndicator",
+            "ActiveSonarIndicator",
+            "SonarModeSwitch",
+            "DirectionalSonarFrame",
+            "SteeringModeSwitch",
+            "MaintainPosTickBox",
+            "AutoTempSwitch",
+            "PowerButton",
+            "FissionRateSlider",
+            "TurbineOutputSlider",
+            "DeconstructButton",
+            "RechargeSpeedSlider",
+            "CPRButton",
+            "CloseButton",
+            "MessageBoxCloseButton"
+          ]
+        },
+        {
+          "name": "ordercategory",
+          "type": "OrderCategory",
+          "default": "Emergency",
+          "choices": [
+            "Emergency",
+            "Movement",
+            "Power",
+            "Maintenance",
+            "Operate"
+          ]
+        },
+        {
+          "name": "orderidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "orderoption",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "ordertargettag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "UnlockPathAction",
+      "properties": []
+    },
+    {
+      "name": "WaitAction",
+      "properties": [
+        {
+          "name": "time",
+          "type": "Single",
+          "default": "0",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "WaitForItemFabricatedAction",
+      "properties": [
+        {
+          "name": "amount",
+          "type": "Int32",
+          "default": "1",
+          "choices": []
+        },
+        {
+          "name": "applytagtoitem",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "charactertag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "itemidentifier",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "itemtag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    },
+    {
+      "name": "WaitForItemUsedAction",
+      "properties": [
+        {
+          "name": "applytagtohull",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "applytagtoitem",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "applytagtolinkedhulls",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "applytagtouser",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "itemtag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "requiredusecount",
+          "type": "Int32",
+          "default": "1",
+          "choices": []
+        },
+        {
+          "name": "targetitemcomponent",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        },
+        {
+          "name": "usertag",
+          "type": "Identifier",
+          "default": "",
+          "choices": []
+        }
+      ]
+    }
+  ]
+}

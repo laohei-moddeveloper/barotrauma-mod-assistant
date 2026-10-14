@@ -1,0 +1,26 @@
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+
+internal static class Launcher
+{
+    private static string Quote(string value)
+    {
+        var result = new StringBuilder("\""); int slashes = 0;
+        foreach (char c in value) { if (c == '\\') { slashes++; continue; } if (c == '"') { result.Append('\\', slashes * 2 + 1); result.Append(c); } else { result.Append('\\', slashes); result.Append(c); } slashes = 0; }
+        result.Append('\\', slashes * 2); result.Append('"'); return result.ToString();
+    }
+    [STAThread]
+    public static void Main(string[] args)
+    {
+        string directory = AppDomain.CurrentDomain.BaseDirectory;
+        string runtime = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "dotnet", "dotnet.exe");
+        string bundled = Path.Combine(directory, "runtime", "dotnet.exe"); if (File.Exists(bundled)) runtime = bundled;
+        if (!File.Exists(runtime)) { MessageBox.Show("需要 Microsoft .NET 10 Windows Desktop Runtime（x64）。安装说明见同目录 README.md。", "BaroEditor"); return; }
+        try { var process = Process.Start(new ProcessStartInfo(runtime, Quote(Path.Combine(directory, "BaroEditor.Desktop.dll")) + " " + string.Join(" ", args.Select(Quote))) { WorkingDirectory = directory, UseShellExecute = false, CreateNoWindow = true }); if (process.WaitForExit(1200) && process.ExitCode != 0) MessageBox.Show("启动失败（代码 " + process.ExitCode + "）。请确认已安装 .NET 10 Windows Desktop Runtime（x64），并完整解压程序文件夹。", "BaroEditor"); }
+        catch (Exception e) { MessageBox.Show(e.Message, "BaroEditor 启动失败"); }
+    }
+}

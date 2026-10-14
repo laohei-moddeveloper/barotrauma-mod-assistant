@@ -1,0 +1,22 @@
+<EventPrefabs>
+  <ScriptedEvent identifier="station_pump_repair" commonness="1">
+    <TagAction criteria="player" tag="player" />
+    <ConversationAction targettag="player" text="你来得正好，站里的水泵又坏了。">
+      <Option text="能帮我们修好它吗？">
+        <ConversationAction targettag="player" text="修好以后来找我，报酬不会少。">
+          <Option text="接下委托">
+            <EventLogAction text="接下了站长的水泵维修委托。" />
+            <ConversationAction targettag="player" text="太好了，工具就在仓库。" />
+          </Option>
+          <Option text="这次算了" endconversation="true" />
+        </ConversationAction>
+      </Option>
+    </ConversationAction>
+    <CheckMoneyAction amount="100">
+      <Success><MoneyAction amount="-100" /></Success>
+      <Failure><ConversationAction targettag="player" text="费用不够，下次再来吧。" /></Failure>
+    </CheckMoneyAction>
+    <WaitAction time="1" />
+  </ScriptedEvent>
+  <ScriptedEvent identifier="new_event"><WaitAction time="1" /></ScriptedEvent>
+</EventPrefabs>

@@ -8,6 +8,17 @@
 
 [Steam 创意工坊订阅](https://steamcommunity.com/sharedfiles/filedetails/?id=3819517380) · [GitHub 发布下载](https://github.com/laohei-moddeveloper/baroeditor/releases)
 
+## 两个版本
+
+| 版本 | 适合的用法 | 下载 |
+| --- | --- | --- |
+| 游戏内 | 在原版事件编辑器工作，需 LuaCs | [工坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3819517380) · [v0.1.1](https://github.com/laohei-moddeveloper/baroeditor/releases/tag/v0.1.1) |
+| 独立程序 | 所有动作的拖动画布，Windows 程序，无需开游戏 | [工坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3819572370) · [v0.2.0](https://github.com/laohei-moddeveloper/baroeditor/releases/tag/v0.2.0-desktop) |
+
+两版通过原生 XML 文件或复制粘贴互通，不要求同时安装。[独立版完整说明](Desktop/BaroEditor/README.md)。
+
+下面是游戏内版的说明。
+
 ## 功能
 
 - 导入指定 XML 文件，或载入游戏已经加载的 ScriptedEvent / TraitorEvent；在原内容上修改。

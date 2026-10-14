@@ -1,0 +1,33 @@
+BaroEditor|潜渊症通用事件编辑器【游戏内】
+
+[b]用原版界面编辑事件，保留原生 XML。[/b]
+导入已有事件，在树中查看 Action、分支、属性和子树；连续对话可以每行一句编辑，减少嵌套 XML 的手写工作。
+
+[b]能力范围[/b]
+动态识别当前游戏的原版 Action；通用属性编辑、子树 XML、节点复制/移动/删除、撤销重做。复杂 Action 使用通用编辑，并非每类都有专用图形向导。可载入游戏已加载事件，也可对接原版节点图。
+
+[b]汉化与搜索[/b]
+66 个原版动作及其属性显示中文，XML 原名保留。事件树、属性、动作添加和事件载入支持中英文关键词搜索；搜索保留父级上下文并使用延迟过滤、索引缓存。复制 XML 带换行缩进。
+
+[b]文件输出[/b]
+默认导出新 XML 到 %LOCALAPPDATA%/BaroEditor/Exports。提供复制选中事件或完整 XML；覆盖本地源文件是单独确认的高级操作，先备份并检查外部修改。游戏内存事件只能导出或复制，原版资源与工坊缓存保持只读。
+
+[b]安装[/b]
+需要 LuaCsForBarotrauma 的客户端运行支持和 C# 模组许可。启用 LuaCs 与 BaroEditor，回主菜单按 F3 输入 baroeditor。原版事件编辑器也提供入口。不要求服务器安装。
+
+[b]性能与访问[/b]
+按操作处理 XML，缓存 Action 元数据，折叠树按需生成。无联网、遥测、目录扫描或导入事件执行。LuaCs C# 代码运行于游戏进程，是受信任代码，不是独立权限沙箱。运行包不改游戏 DLL，也不自动开启全局 C# 策略。
+
+[b]0.1.1 预览版[/b]
+671 项离线检查通过；基础游戏界面、批量对话窗口和元数据检查通过。本地 1.13.4.0 核对到 66 个 Action 与 313 个属性。封面为实际游戏内界面。本次新增搜索交互仍需人工核验；复杂事件运行和完整节点图往返尚未充分验证。
+
+[url=https://github.com/laohei-moddeveloper/baroeditor]GitHub 源码、独立下载和使用说明[/url]
+
+独立社区工具，非游戏官方组件。MIT License。
+
+[b]另一版本：独立程序[/b]
+不想打开游戏时，可以使用独立 Windows 工作台：所有原版动作都有可拖动、可点击编辑的画布节点，支持分支连线、通用属性、汉化搜索、工程保存和 XML 输出。独立版无需 LuaCs，需要 .NET 10 Windows Desktop Runtime。两版通过原生 XML 或复制粘贴互通，不要求同时订阅。
+[url=https://steamcommunity.com/sharedfiles/filedetails/?id=3819572370]BaroEditor 通用事件编辑器【独立程序】[/url]
+
+[b]English[/b]
+This is the in-game edition, requiring client-side LuaCs and C# support. Use the vanilla event editor with XML tree/property editing, event import, bilingual search and formatted clipboard output. The separate desktop edition provides a draggable canvas for all native Actions and runs without the game or LuaCs. Both editions exchange native event XML and can be installed separately; the desktop Workshop link is above.
