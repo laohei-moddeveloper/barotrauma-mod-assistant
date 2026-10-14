@@ -19,10 +19,10 @@ function Emit-BE($Name,$Files,$References,$Kind) {
     $beOptions=[Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions]::new($Kind).WithOptimizationLevel([Microsoft.CodeAnalysis.OptimizationLevel]::Release)
     if($Name -eq 'BaroEditor.Desktop.Tests') {$beOptions=$beOptions.WithMainTypeName('StandaloneTests')}
     $beCompilation=[Microsoft.CodeAnalysis.CSharp.CSharpCompilation]::Create($Name,$beTrees.ToArray(),[Microsoft.CodeAnalysis.MetadataReference[]]$References,$beOptions)
-    $beStream=[IO.MemoryStream]::new();$beResource=$null;$beManifest=$null
-    if($Name -eq 'BaroEditor') {$beManifest=[IO.File]::OpenRead((Join-Path $beRoot 'app.manifest')); $beResource=$beCompilation.CreateDefaultWin32Resources($true,$false,$beManifest,$null)}
+    $beStream=[IO.MemoryStream]::new();$beResource=$null;$beManifest=$null;$beIcon=$null
+    if($Name -eq 'BaroEditor') {$beManifest=[IO.File]::OpenRead((Join-Path $beRoot 'app.manifest')); $beIcon=[IO.File]::OpenRead((Join-Path $beRoot 'Assets/app.ico')); $beResource=$beCompilation.CreateDefaultWin32Resources($true,$false,$beManifest,$beIcon)}
     $beEmit=$beCompilation.Emit($beStream,$null,$null,$beResource)
-    if($beResource) {$beResource.Dispose()}; if($beManifest) {$beManifest.Dispose()}
+    if($beResource) {$beResource.Dispose()}; if($beManifest) {$beManifest.Dispose()}; if($beIcon) {$beIcon.Dispose()}
     $beDiagnostics=@($beEmit.Diagnostics | Where-Object {$_.Severity -ne [Microsoft.CodeAnalysis.DiagnosticSeverity]::Hidden} | ForEach-Object ToString)
     if(!$beEmit.Success) {$beStream.Dispose(); throw ($beDiagnostics -join "`n")}
     $beExtension=if($Name -eq 'BaroEditor') {'.exe'} else {'.dll'}

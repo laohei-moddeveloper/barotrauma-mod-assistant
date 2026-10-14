@@ -15,6 +15,7 @@ namespace BaroEditor
         public string Scope { get; set; }
         public string Selected { get; set; }
         public Dictionary<string, NodePosition> Positions { get; set; } = new();
+        public LocalizationData Localization { get; set; }
     }
     public sealed class GraphNode
     {
@@ -30,10 +31,13 @@ namespace BaroEditor
         public string Scope { get; private set; } = "";
         public string Selected { get; private set; } = "";
         public Dictionary<XElement, NodePosition> Positions { get; } = new();
+        public Localization Localization { get; } = new();
         private EventSearch search;
         private long searchRevision = -1;
+        private long localizationRevision = -1;
         private readonly List<(bool Xml, Dictionary<string, NodePosition> Before, Dictionary<string, NodePosition> After, string SelectionBefore, string SelectionAfter)> undo = new(), redo = new();
         private string savedProject;
+        private long savedLocalizationRevision;
         public bool CanUndo => undo.Count > 0;
         public bool CanRedo => redo.Count > 0;
         public Workspace(EventDocument document) { Load(document); }
@@ -50,7 +54,7 @@ namespace BaroEditor
             HashSet<string> visible = null;
             if (!string.IsNullOrWhiteSpace(query))
             {
-                if (search == null || searchRevision != Document.Revision) { search = new EventSearch(Document.Xml.Root); searchRevision = Document.Revision; }
+                if (search == null || searchRevision != Document.Revision || localizationRevision != Localization.Revision) { search = new EventSearch(Document.Xml.Root, Localization.SearchText); searchRevision = Document.Revision; localizationRevision = Localization.Revision; }
                 visible = search.Find(query, Scope, out _, out _, 300);
             }
             var list = new List<GraphNode>(); var stack = new Stack<(XElement Xml, string Path, string Parent, int Depth)>();
@@ -168,11 +172,14 @@ namespace BaroEditor
             Select(Document.PathOf(targetNode));
             FinalizeSelection();
         }
-        public ProjectFile Snapshot() => new() { Xml = Document.Text, Scope = Scope, Selected = Selected, Positions = CapturePositions() };
-        public bool ProjectDirty => savedProject != null ? savedProject != JsonSerializer.Serialize(Snapshot()) : Document.Dirty || undo.Count > 0;
+        public ProjectFile Snapshot() => new() { Xml = Document.Text, Scope = Scope, Selected = Selected, Positions = CapturePositions(), Localization = Localization.Snapshot() };
+        private string ProjectState() => JsonSerializer.Serialize(new ProjectFile { Xml = Document.Text, Scope = Scope, Selected = Selected, Positions = CapturePositions() });
+        public bool ProjectDirty => savedProject != null ? savedLocalizationRevision != Localization.Revision || savedProject != ProjectState() : Document.Dirty || undo.Count > 0 || Localization.Languages.Any();
         public void SaveProject(string path)
         {
-            string text = JsonSerializer.Serialize(Snapshot()); WriteProject(path, text); savedProject = text;
+            string text = JsonSerializer.Serialize(Snapshot(), new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+            if (System.Text.Encoding.UTF8.GetByteCount(text) > 64 * 1024 * 1024) throw new InvalidDataException("工程超过 64 MiB。");
+            WriteProject(path, text); savedProject = ProjectState(); savedLocalizationRevision = Localization.Revision;
         }
         public void ReadProject(string path)
         {
@@ -181,8 +188,9 @@ namespace BaroEditor
             if (project?.FormatVersion != 1 || project.Positions == null || project.Positions.Count > EventDocument.MaxElements) throw new InvalidDataException("不支持的工程格式。");
             if (project.Positions.Keys.Any(k => k.Length > 640) || (project.Scope?.Length ?? 0) > 640 || (project.Selected?.Length ?? 0) > 640) throw new InvalidDataException("工程路径长度无效。");
             var document = new EventDocument(project.Xml);
+            var importedLocalization = new Localization(); importedLocalization.Restore(project.Localization);
             foreach (var p in project.Positions.Values) if (!double.IsFinite(p.X) || !double.IsFinite(p.Y) || p.X < 0 || p.Y < 0 || p.X > 100000 || p.Y > 100000) throw new InvalidDataException("工程坐标无效。");
-            Load(document); Scope = project.Scope ?? ""; Selected = project.Selected ?? Scope; ValidateSelection(); Restore(project.Positions); savedProject = JsonSerializer.Serialize(Snapshot());
+            Load(document); Localization.Restore(importedLocalization.Snapshot()); Scope = project.Scope ?? ""; Selected = project.Selected ?? Scope; ValidateSelection(); Restore(project.Positions); savedProject = ProjectState(); savedLocalizationRevision = Localization.Revision;
         }
         private static void WriteProject(string path, string text)
         {

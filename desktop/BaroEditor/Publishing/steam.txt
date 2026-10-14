@@ -3,6 +3,9 @@ BaroEditor|潜渊症通用事件编辑器【独立程序】
 [b]这是 Windows 独立程序，所有原版动作都可以在画布编辑。[/b]
 66 个原版 Action、313 个属性，动作库汉化与搜索。拖入动作、拖动节点、点击编辑属性、拖动圆点连接分支；实线为结构分支，虚线为同级顺序。支持剧本卡片、对话批量编辑和本地流程试播。
 
+[b]0.2.1 更新[/b]
+空白处直接拖动画布；全图按实际节点范围缩放，解决原缩放下限看不全的问题。点击连线或 › 跳转点，以可读比例定位下一节点。支持导入多语言 infotexts XML，译文用于卡片、搜索和试播，工程内保存词条，导出 XML 保留原标签。新增程序与窗口图标。
+
 [b]导入和保存[/b]
 导入原版或模组事件 XML，在原内容上修改；保留未知节点、注释、命名空间和属性。工程保存节点位置与 XML 草稿，默认导出新 XML，复制带换行缩进。高级覆盖另行确认并备份。试播手动选择条件，不执行游戏效果。
 
@@ -10,7 +13,7 @@ BaroEditor|潜渊症通用事件编辑器【独立程序】
 订阅并等待 Steam 下载完成。在 Steam 安装目录下找到：
 steamapps/workshop/content/602960/3819572370/Standalone/BaroEditor.exe
 双击打开。仅在游戏模组列表启用本条目不会启动程序。需要 Microsoft .NET 10 Windows Desktop Runtime（x64）；无需打开游戏、安装 LuaCs 或管理员运行。不自动安装任何运行时。
-[url=https://github.com/laohei-moddeveloper/baroeditor/releases/tag/v0.2.0-desktop]也可以从 GitHub 直接下载独立版 ZIP[/url]
+[url=https://github.com/laohei-moddeveloper/baroeditor/releases/tag/v0.2.1-desktop]也可以从 GitHub 直接下载独立版 ZIP[/url]
 
 [b]性能与访问[/b]
 离线运行，无网络请求、遥测、后台扫描、进程注入或事件执行。搜索延迟过滤并缓存索引；拖动只更新位置和关联连线；画布有界显示。只访问所选文件和自己的动作目录。
@@ -19,8 +22,8 @@ steamapps/workshop/content/602960/3819572370/Standalone/BaroEditor.exe
 希望在原版事件编辑器里工作，可使用游戏内版：需要 LuaCs，提供游戏已加载事件载入与原版节点图对接。两版通过原生 XML 或复制粘贴互通，不需要同时订阅。
 [url=https://steamcommunity.com/sharedfiles/filedetails/?id=3819517380]BaroEditor 通用事件编辑器【游戏内】[/url]
 
-[b]0.2.0 预览版[/b]
-170 项独立检查、671 项 XML 回归检查通过，已检查实际 WPF 回调与渲染。封面为实际程序界面。动作目录来自 1.13.4.0；复杂事件运行与所有输入设备尚未充分验证。
+[b]0.2.1 预览版[/b]
+188 项独立检查、671 项 XML 回归检查通过，已检查实际 WPF 回调与渲染。封面为实际程序界面。动作目录来自 1.13.4.0；复杂事件运行与所有输入设备尚未充分验证。
 
 [b]English[/b]
 Standalone Windows event editor for all 66 native Actions, with searchable Chinese labels, draggable canvas nodes, branch wiring, generic properties, XML import/export, layout projects, script cards and a local walkthrough. The walkthrough never executes gameplay effects. Unknown XML content is retained. Launch Standalone/BaroEditor.exe from this Workshop download; enabling the entry in game does not launch the application. Requires the .NET 10 Windows Desktop Runtime x64, not LuaCs. The optional in-game edition is linked above. This is a community preview under the MIT License.

@@ -62,6 +62,7 @@ internal static class StandaloneTests
             Console.WriteLine("5,000-node bounded canvas query: " + watch.ElapsedMilliseconds + " ms");
             var playback = new FlowPreview(); var flow = XElement.Parse("<ScriptedEvent><CheckMoneyAction><Success><MoneyAction amount='5'/></Success><Failure><WaitAction time='2'/></Failure></CheckMoneyAction><TriggerEventAction identifier='other'/></ScriptedEvent>"); playback.Start(flow); Check(playback.Current.Name.LocalName == "CheckMoneyAction" && playback.Choices.Count() == 2, "General Action flow offers condition branches");
             playback.Advance(playback.Choices.Last()); Check(playback.Current.Name.LocalName == "WaitAction", "Manual failure walkthrough"); playback.Advance(); Check(playback.Current.Name.LocalName == "TriggerEventAction", "Walkthrough resumes event sequence"); playback.Advance(); Check(playback.Current == null, "Walkthrough ends without executing effects");
+            checks += LocalizationTests.Run(scratch);
             int legacy = CoreTests.Main(new[] { Path.Combine(scratch,"xml-regressions"), args[2], args[3] }); Check(legacy == 0, "Existing XML regression suite passed");
             Console.WriteLine("PASS: " + checks + " standalone checks plus 671 XML checks"); return 0;
         }

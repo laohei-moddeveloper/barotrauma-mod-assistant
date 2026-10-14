@@ -8,7 +8,7 @@ namespace BaroEditor
     public sealed class EventSearch
     {
         private readonly List<(string Path, string Text)> entries = new();
-        public EventSearch(XElement root)
+        public EventSearch(XElement root, Func<XElement, string> extraText = null)
         {
             var pending = new Stack<(XElement Node, string Path)>(); pending.Push((root, ""));
             while (pending.Count > 0)
@@ -17,7 +17,7 @@ namespace BaroEditor
                 string text = entry.Node.Name.LocalName + " " + EditorText.Node(entry.Node.Name.LocalName) + " " +
                     string.Join(" ", entry.Node.Attributes().Where(a => !a.IsNamespaceDeclaration).Select(a => a.Name.LocalName + " " + EditorText.Property(a.Name.LocalName) + " " + a.Value)) + " " +
                     string.Join(" ", entry.Node.Nodes().OfType<XText>().Where(t => !string.IsNullOrWhiteSpace(t.Value)).Select(t => t.Value));
-                entries.Add((entry.Path, text));
+                entries.Add((entry.Path, text + " " + extraText?.Invoke(entry.Node)));
                 var children = entry.Node.Elements().ToArray();
                 for (int i = children.Length - 1; i >= 0; i--) pending.Push((children[i], entry.Path.Length == 0 ? i.ToString() : entry.Path + "/" + i));
             }

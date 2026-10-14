@@ -64,6 +64,7 @@ namespace BaroEditor.Desktop
             ShowActivated = false;
 #endif
             Background = bg; Foreground = ink; FontFamily = new FontFamily("Microsoft YaHei UI"); FontSize = 13;
+            Icon = BitmapFrame.Create(new Uri(Path.Combine(AppContext.BaseDirectory, "Assets/app.ico")));
             catalog = Catalog.Load(Path.Combine(AppContext.BaseDirectory, "Assets/actions.json"));
             Model = new Workspace(new EventDocument(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Assets/example.xml"))));
             ApplyStyles(); BuildShell(); RefreshAll();
@@ -129,7 +130,7 @@ namespace BaroEditor.Desktop
             commands.Children.Add(undo); commands.Children.Add(redo); commands.Children.Add(Btn("保存工程", SaveProject)); commands.Children.Add(Btn("导出 XML", ExportXml, true)); header.Children.Add(commands);
             var brand = new StackPanel(); brand.Children.Add(Text("BAROEDITOR", 23, accent, true)); brand.Children.Add(Text("潜渊症通用事件编辑器    /    独立工作台", 12, muted)); header.Children.Add(brand); At(root, header);
             var toolbar = new DockPanel(); var fileActions = new StackPanel { Orientation = Orientation.Horizontal };
-            fileActions.Children.Add(Btn("＋ 新建", NewFile)); fileActions.Children.Add(Btn("导入文件", OpenFile)); fileActions.Children.Add(Btn("原版事件文件", OpenVanilla)); fileActions.Children.Add(Btn("更多 ▾", ShowTools)); DockPanel.SetDock(fileActions, Dock.Left); toolbar.Children.Add(fileActions);
+            fileActions.Children.Add(Btn("＋ 新建", NewFile)); fileActions.Children.Add(Btn("导入文件", OpenFile)); fileActions.Children.Add(Btn("原版事件文件", OpenVanilla)); fileActions.Children.Add(Btn("本地化 ▾", ShowLocalization)); fileActions.Children.Add(Btn("更多 ▾", ShowTools)); DockPanel.SetDock(fileActions, Dock.Left); toolbar.Children.Add(fileActions);
             documentLabel = Text("", 12, muted); documentLabel.TextTrimming = TextTrimming.CharacterEllipsis; toolbar.Children.Add(documentLabel); At(root, toolbar, 1);
             var work = new Grid(); work.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(230), MinWidth = 190, MaxWidth = 360 }); work.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) }); work.ColumnDefinitions.Add(new ColumnDefinition { Width = Star, MinWidth = 470 }); work.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(10) }); work.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(330), MinWidth = 280, MaxWidth = 520 }); At(root, work, 2);
             At(work, BuildPalette(), 0, 0); At(work, new GridSplitter { Width = 5, HorizontalAlignment = HorizontalAlignment.Center, Background = line, ResizeBehavior = GridResizeBehavior.PreviousAndNext }, 0, 1);
@@ -147,18 +148,32 @@ namespace BaroEditor.Desktop
         {
             center = Rows(Auto, Auto, Star);
             var top = new DockPanel { Margin = new Thickness(0, 0, 0, 10) }; var tabs = new StackPanel { Orientation = Orientation.Horizontal }; graphTab = Btn("节点画布", () => SwitchMode(false)); scriptTab = Btn("剧本卡片", () => SwitchMode(true)); tabs.Children.Add(graphTab); tabs.Children.Add(scriptTab); DockPanel.SetDock(tabs, Dock.Left); top.Children.Add(tabs);
-            var view = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right }; view.Children.Add(Btn("整理", Arrange)); view.Children.Add(Btn("适配", Fit)); zoom = new Slider { Minimum = .25, Maximum = 1.8, Value = 1, Width = 90, VerticalAlignment = VerticalAlignment.Center, ToolTip = "画布缩放 · Ctrl + 滚轮" }; zoom.ValueChanged += (_, _) => { scale.ScaleX = scale.ScaleY = zoom.Value; }; view.Children.Add(zoom); top.Children.Add(view); At(center, top);
+            var view = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right }; view.Children.Add(Btn("整理", Arrange)); view.Children.Add(Btn("全图", Fit)); var focus = Btn("定位", () => FocusNode(Model.Selected)); focus.ToolTip = "以可读比例定位选中节点；连线上的箭头圆点跳到目标节点"; view.Children.Add(focus); zoom = new Slider { Minimum = -3, Maximum = Math.Log10(1.8), Value = 0, Width = 60, VerticalAlignment = VerticalAlignment.Center, ToolTip = "画布缩放 0.1%–180% · Ctrl + 滚轮" }; zoom.ValueChanged += (_, _) => { scale.ScaleX = scale.ScaleY = Math.Pow(10, zoom.Value); }; view.Children.Add(zoom); top.Children.Add(view); At(center, top);
             var search = Rows(Auto, Auto); events = new ComboBox { MinHeight = 30, DisplayMemberPath = "Caption" }; events.SelectionChanged += (_, _) => { if (!building && events.SelectedItem is EventChoice choice) { CommitInspector(); Model.SetScope(choice.Path); RefreshAll(); } };
             events.ItemsPanel = new ItemsPanelTemplate(new FrameworkElementFactory(typeof(VirtualizingStackPanel))); VirtualizingPanel.SetIsVirtualizing(events, true); ScrollViewer.SetCanContentScroll(events, true);
             var eventRow = new DockPanel(); var eventProps = Btn("事件属性", () => SelectNode(Model.Scope)); eventProps.Margin = new Thickness(8, 0, 0, 0); DockPanel.SetDock(eventProps, Dock.Right); eventRow.Children.Add(eventProps); eventRow.Children.Add(events); At(search, eventRow);
             nodeSearch = Search("搜索节点、台词、标识符、标签；多个关键词用空格分隔", _ => { CommitInspector(); RefreshGraph(); }, "nodes"); At(search, nodeSearch, 1); At(center, search, 1);
             canvas = new Canvas { Background = GridBrush(), Width = 2000, Height = 1400, AllowDrop = true, LayoutTransform = scale, ClipToBounds = true };
             canvas.Drop += CanvasDrop; canvas.DragOver += (_, e) => { e.Effects = e.Data.GetDataPresent("BaroEditor.Action") ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
-            canvas.MouseLeftButtonDown += (_, e) => { if (e.OriginalSource == canvas) { linkSource = null; if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) { panOrigin = e.GetPosition(graphScroll); panX = graphScroll.HorizontalOffset; panY = graphScroll.VerticalOffset; canvas.CaptureMouse(); } SetStatus("拖动节点移动位置；输出圆点连线；Shift + 拖动平移"); } };
-            canvas.MouseMove += (_, e) => { if (panOrigin is Point start && e.LeftButton == MouseButtonState.Pressed) { var point = e.GetPosition(graphScroll); graphScroll.ScrollToHorizontalOffset(panX + start.X - point.X); graphScroll.ScrollToVerticalOffset(panY + start.Y - point.Y); } else if (linkSource != null) DrawGhost(e.GetPosition(canvas)); };
-            canvas.MouseLeftButtonUp += (_, _) => { if (panOrigin != null) { panOrigin = null; canvas.ReleaseMouseCapture(); } };
-            graphScroll = new ScrollViewer { Content = canvas, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            graphScroll.PreviewMouseWheel += (_, e) => { if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) { zoom.Value = Math.Clamp(zoom.Value + (e.Delta > 0 ? .08 : -.08), .25, 1.8); e.Handled = true; } };
+            canvas.MouseMove += (_, e) => { if (linkSource != null && panOrigin == null) DrawGhost(e.GetPosition(canvas)); };
+            graphScroll = new ScrollViewer { Content = canvas, Background = bg, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            graphScroll.PreviewMouseDown += (_, e) =>
+            {
+                bool blank = ReferenceEquals(e.OriginalSource, canvas) || ReferenceEquals(e.OriginalSource, graphScroll);
+                if (e.ChangedButton == MouseButton.Middle || e.ChangedButton == MouseButton.Left && (blank || Keyboard.IsKeyDown(Key.Space) || Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)))
+                { linkSource = null; if (ghost != null) ghost.Data = null; panOrigin = e.GetPosition(graphScroll); panX = graphScroll.HorizontalOffset; panY = graphScroll.VerticalOffset; graphScroll.CaptureMouse(); graphScroll.Cursor = Cursors.ScrollAll; e.Handled = true; }
+            };
+            graphScroll.MouseMove += (_, e) => { if (panOrigin is Point start) { var point = e.GetPosition(graphScroll); graphScroll.ScrollToHorizontalOffset(panX + start.X - point.X); graphScroll.ScrollToVerticalOffset(panY + start.Y - point.Y); e.Handled = true; } };
+            graphScroll.MouseUp += (_, e) => { if (panOrigin != null) { panOrigin = null; graphScroll.ReleaseMouseCapture(); graphScroll.Cursor = null; e.Handled = true; } };
+            graphScroll.LostMouseCapture += (_, _) => { panOrigin = null; graphScroll.Cursor = null; };
+            graphScroll.PreviewMouseWheel += (_, e) =>
+            {
+                if (!Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) return;
+                Point pointer = e.GetPosition(graphScroll); double oldScale = scale.ScaleX;
+                Point world = new((graphScroll.HorizontalOffset + pointer.X) / oldScale, (graphScroll.VerticalOffset + pointer.Y) / oldScale);
+                zoom.Value = Math.Clamp(zoom.Value + (e.Delta > 0 ? .09 : -.09), zoom.Minimum, zoom.Maximum);
+                graphScroll.UpdateLayout(); graphScroll.ScrollToHorizontalOffset(world.X * scale.ScaleX - pointer.X); graphScroll.ScrollToVerticalOffset(world.Y * scale.ScaleY - pointer.Y); e.Handled = true;
+            };
             graphSurface = Box(graphScroll, new Thickness(0)); At(center, graphSurface, 2);
             script = new StackPanel { Margin = new Thickness(14) }; scriptSurface = Box(new ScrollViewer { Content = script, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled }, new Thickness(0)); scriptSurface.Visibility = Visibility.Collapsed; At(center, scriptSurface, 2);
             return center;

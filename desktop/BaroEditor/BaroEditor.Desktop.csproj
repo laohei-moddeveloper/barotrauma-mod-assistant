@@ -6,8 +6,9 @@
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>BaroEditor.Desktop</AssemblyName>
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/app.ico</ApplicationIcon>
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
@@ -15,6 +16,7 @@
     <Compile Remove="tests/**/*.cs" />
     <Content Include="Assets/actions.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets/example.xml" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets/app.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="README.md" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="LICENSE" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

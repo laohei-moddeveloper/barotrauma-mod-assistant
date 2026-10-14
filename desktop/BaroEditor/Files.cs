@@ -97,7 +97,7 @@ namespace BaroEditor.Desktop
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) }; buttons.Children.Add(Btn("取消", dialog.Close)); buttons.Children.Add(accept); At(root, buttons, 2); Filter(""); dialog.ShowDialog();
         }
         private void ShowHelp() => MessageBox.Show(this,
-            "所有原版动作和 XML 容器都可在画布编辑。\n\n• 动作库：拖入节点或空白画布添加；点击按当前上下文添加。\n• 节点：拖动改变布局；双击编辑文本或 XML；右侧编辑全部属性。\n• 连线：点击右侧输出圆点，选择分支，再点击目标左侧输入圆点。下一动作按同级 XML 顺序连接。\n• 剧本卡片：同级节点拖动排序；跨分支用画布连接。\n• Ctrl + 滚轮缩放；Shift + 拖动画布平移；整理自动排列。\n• 保存工程：保留 XML 草稿和节点位置；导出 XML：默认保存副本。\n• 本地流程试播需手动选择条件分支，不执行游戏逻辑。\n\nCtrl+O 导入；Ctrl+S 保存工程；Ctrl+Shift+S 导出 XML；F2 编辑节点。文本框中的 Ctrl+Z 撤销输入，工作区 Ctrl+Z 撤销操作。\n\n离线运行，无扫描、遥测、游戏程序集加载或管理员权限要求。",
+            "所有原版动作和 XML 容器都可在画布编辑。\n\n• 动作库：拖入节点或空白画布添加；点击按当前上下文添加。\n• 节点：拖动改变布局；双击编辑文本或 XML；右侧编辑全部属性。\n• 连线：点击右侧输出圆点，选择分支，再点击目标左侧输入圆点。下一动作按同级 XML 顺序连接。\n• 剧本卡片：同级节点拖动排序；跨分支用画布连接。\n• 拖动空白画布平移；中键或空格 + 拖动也可平移。Ctrl + 滚轮围绕指针缩放；全图显示概览，定位恢复可读比例。\n• 线上的 › 圆点跳到目标节点，保留事件原文。\n• 本地化菜单导入 infotexts XML、切换语言；卡片、搜索、试播显示译文。工程内保存词条，XML 导出保留标签。\n• 保存工程：保留 XML 草稿和节点位置；导出 XML：默认保存副本。\n• 本地流程试播需手动选择条件分支，不执行游戏逻辑。\n\nCtrl+O 导入；Ctrl+S 保存工程；Ctrl+Shift+S 导出 XML；F2 编辑节点。文本框中的 Ctrl+Z 撤销输入，工作区 Ctrl+Z 撤销操作。\n\n离线运行，无扫描、遥测、游戏程序集加载或管理员权限要求。",
             "BaroEditor 独立工作台", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 }

@@ -34,6 +34,9 @@ namespace BaroEditor.Desktop
                     var names = new StackPanel(); names.Children.Add(Text(EditorText.Property(local), 12, ink, true)); var raw = Text(key + (hint != null ? " · " + hint.Type : " · XML"), 10, muted); raw.TextTrimming = TextTrimming.CharacterEllipsis; raw.TextWrapping = TextWrapping.NoWrap; names.Children.Add(raw); top.Children.Add(names); body.Children.Add(top);
                     var input = new TextBox { Text = attribute?.Value ?? hint?.Default ?? "", IsEnabled = attribute != null, MaxLength = EventDocument.MaxBytes, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0, 8, 0, 0), MinHeight = local is "text" or "message" || (attribute?.Value.Length ?? 0) > 80 ? 84 : 36, MaxHeight = 150, ToolTip = hint == null ? "扩展属性，保持原值" : "原版属性 · 默认：" + hint.Default + (hint.Choices.Length > 0 ? "\n可选值：" + string.Join(", ", hint.Choices) : "") };
                     body.Children.Add(input);
+                    var translation = Text("", 11, accent); translation.Margin = new Thickness(0, 6, 0, 0); translation.MaxHeight = 100;
+                    void ShowTranslation() { string resolved = Model.Localization.Resolve(input.Text); translation.Text = resolved != input.Text ? "本地化预览：" + resolved : ""; translation.Visibility = resolved != input.Text ? Visibility.Visible : Visibility.Collapsed; }
+                    input.TextChanged += (_, _) => ShowTranslation(); ShowTranslation(); body.Children.Add(translation);
                     enabled.Checked += (_, _) => { input.IsEnabled = true; enabled.Content = "已设置"; }; enabled.Unchecked += (_, _) => { input.IsEnabled = false; enabled.Content = "启用"; };
                     if (hint != null && (hint.Type == "Boolean" || hint.Choices.Length > 0))
                     {
@@ -136,10 +139,10 @@ namespace BaroEditor.Desktop
             if (node == null) playback.Children.Add(Text(preview.Limited ? "已到达 256 步上限" : "流程结束", 19, ink, true));
             else
             {
-                var body = new StackPanel(); body.Children.Add(Text(EditorText.Node(node.Name.LocalName), 14, accent, true)); string text = EventDocument.Attribute(node, "text"); body.Children.Add(Text(text.Length > 0 ? text : NodeDescription(node), 16, ink)); body.Children.Add(Text(node.Name.LocalName, 10, muted)); var card = Box(body); card.Margin = new Thickness(0, 18, 0, 16); playback.Children.Add(card);
+                var body = new StackPanel(); body.Children.Add(Text(EditorText.Node(node.Name.LocalName), 14, accent, true)); string text = Model.Localization.Text(node); body.Children.Add(Text(text.Length > 0 ? text : NodeDescription(node), 16, ink)); body.Children.Add(Text(node.Name.LocalName, 10, muted)); var card = Box(body); card.Margin = new Thickness(0, 18, 0, 16); playback.Children.Add(card);
                 foreach (var branch in preview.Choices)
                 {
-                    string label = EventDocument.Attribute(branch, "text"); var choice = Btn(label.Length > 0 ? label : EditorText.Node(branch.Name.LocalName), () => { preview.Advance(branch); RefreshPreview(); }); choice.Margin = new Thickness(0, 0, 0, 9); playback.Children.Add(choice);
+                    string label = Model.Localization.Text(branch); var choice = Btn(label.Length > 0 ? label : EditorText.Node(branch.Name.LocalName), () => { preview.Advance(branch); RefreshPreview(); }); choice.Margin = new Thickness(0, 0, 0, 9); playback.Children.Add(choice);
                 }
                 if (!preview.Choices.Any()) { var next = Btn("继续 →", () => { preview.Advance(); RefreshPreview(); }, true); next.Margin = new Thickness(0, 0, 0, 12); playback.Children.Add(next); }
                 var locate = Btn("在画布中定位", () => { SelectNode(Model.Document.PathOf(node)); if (Model.Positions.TryGetValue(node, out var point)) { graphScroll.ScrollToHorizontalOffset(Math.Max(0, point.X * zoom.Value - 60)); graphScroll.ScrollToVerticalOffset(Math.Max(0, point.Y * zoom.Value - 80)); } }); playback.Children.Add(locate);
