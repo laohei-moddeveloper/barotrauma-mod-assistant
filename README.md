@@ -66,6 +66,8 @@ py -3.12 -m venv .build-tools
 
 入口为 `run_assistant.py`，源码在 `mod_assistant`，构建输出在 `dist`。界面截图开发工具额外需要 Pillow。原始环境调查、个人配置、游戏内容、第三方参考源码、缓存、日志和本机工具目录不纳入 Git。
 
+Codex 云端开发和两个独立 Git 仓库的分支同步方式见 [云端开发说明](docs/cloud-development.md)。
+
 ## 依据
 
 使用本机游戏自带的 Steam 接口库，接口依据 [ISteamUGC 官方文档](https://partner.steamgames.com/doc/api/ISteamUGC)。LuaCs 补丁来自 [官方发布](https://github.com/evilfactory/LuaCsForBarotrauma/releases/tag/latest)，安装方式依据 [官方手动安装文档](https://github.com/evilfactory/LuaCsForBarotrauma/blob/master/luacs-docs/lua/manual/installing-lua-for-barotrauma-manually.md)。本仓库和下载包不分发原版游戏文件或第三方工坊模组。
